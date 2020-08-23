@@ -54,7 +54,7 @@ This will attempt to proxy all services in Kubernetes to your local machine unde
 ### Help! I have a port-collision, what do I do?
 
 The downside to local development is this happens :( However, we have a way to "change" the port that is exposed locally.
-Simply add a `localizer.jaredallard.github.com/remap: "servicePort:localPort"` annotation to the service, and that port 
+Simply add a `localizer.jaredallard.github.com/remap-servicePortName: "localPort"` annotation to the service, and that port 
 will be mapped to `localPort` instead of `servicePort` when `localizer` is run
 
 ### Does `localizer` support Windows?

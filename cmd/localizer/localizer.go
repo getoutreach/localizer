@@ -28,6 +28,15 @@ func main() {
 	app := cli.App{
 		Version: "1.0.0",
 		Name:    "localizer",
+		Flags: []cli.Flag{
+			// Note: KUBECONFIG is respected, but we don't allow passing a
+			// CLI argument to reduce the complexity and re-parsing of it.
+			&cli.StringFlag{
+				Name:    "context",
+				Usage:   "Specify Kubernetes context to use",
+				EnvVars: []string{"KUBECONTEXT"},
+			},
+		},
 		Action: func(c *cli.Context) error {
 			return nil
 		},
