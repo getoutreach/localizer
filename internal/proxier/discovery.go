@@ -18,7 +18,10 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
+	corev1 "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -43,27 +46,32 @@ type ServicePort struct {
 	LocalPort  uint
 }
 
-type Client struct {
-	k kubernetes.Interface
+type Discoverer struct {
+	k   kubernetes.Interface
+	log logrus.FieldLogger
 }
 
 // NewClient creates a new discovery client that is
 // capable of finding remote services and creating proxies
-func NewClient(k kubernetes.Interface) *Client {
-	return &Client{
+func NewDiscoverer(k kubernetes.Interface, l logrus.FieldLogger) *Discoverer {
+	return &Discoverer{
 		k,
+		l,
 	}
 }
 
-func (c *Client) Discover(ctx context.Context) ([]*Service, error) {
+// Discover finds services in a Kubernetes cluster and returns ones that
+// should be forwarded locally.
+func (d *Discoverer) Discover(ctx context.Context) ([]Service, error) {
 	cont := ""
 
-	s := make([]*Service, 0)
+	s := make([]Service, 0)
 	for {
-		l, err := c.k.CoreV1().Services("").List(ctx, metav1.ListOptions{Continue: cont})
+		l, err := d.k.CoreV1().Services("").List(ctx, metav1.ListOptions{Continue: cont})
 		if kerrors.IsResourceExpired(err) {
 			// we need a consistent list, so we just restart fetching
-			s = make([]*Service, 0)
+			d.log.Warn("service list expired, refetching all services ...")
+			s = make([]Service, 0)
 			cont = ""
 			continue
 		} else if err != nil {
@@ -71,10 +79,15 @@ func (c *Client) Discover(ctx context.Context) ([]*Service, error) {
 		}
 
 		for _, kserv := range l.Items {
-			serv := &Service{
+			serv := Service{
 				Name:      kserv.Name,
 				Namespace: kserv.Namespace,
 				Ports:     make([]*ServicePort, 0),
+			}
+
+			// skip services that have no ports
+			if len(kserv.Spec.Ports) == 0 {
+				continue
 			}
 
 			remaps := make(map[string]uint)
@@ -85,7 +98,7 @@ func (c *Client) Discover(ctx context.Context) ([]*Service, error) {
 
 				// for now, skip invalid ports. We may want to expose
 				// this someday in the future
-				portOverride, err := strconv.ParseUint(v, 0, 6)
+				portOverride, err := strconv.ParseUint(v, 0, 64)
 				if err != nil {
 					continue
 				}
@@ -101,7 +114,20 @@ func (c *Client) Discover(ctx context.Context) ([]*Service, error) {
 			// convert the Kubernetes ports into our own internal data model
 			// we also handle overriding localPorts via the RemapAnnotation here.
 			for _, p := range kserv.Spec.Ports {
+				// we only support TCP services currently.
+				if p.Protocol != corev1.ProtocolTCP {
+					continue
+				}
+
 				localPort := uint(p.Port)
+
+				// if a service only has one port, name is not required.
+				// In that case, we just name it the port. This allows users to still
+				// override it if needed.
+				if p.Name == "" {
+					p.Name = strconv.Itoa(int(p.Port))
+				}
+
 				override := remaps[strings.ToLower(p.Name)]
 				if override != 0 {
 					localPort = override
@@ -113,6 +139,7 @@ func (c *Client) Discover(ctx context.Context) ([]*Service, error) {
 				})
 			}
 
+			spew.Dump(serv)
 			s = append(s, serv)
 		}
 

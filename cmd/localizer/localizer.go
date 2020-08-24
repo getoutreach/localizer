@@ -17,6 +17,9 @@ import (
 	"context"
 	"os"
 
+	"github.com/jaredallard/localizer/internal/kube"
+	"github.com/jaredallard/localizer/internal/proxier"
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
 )
@@ -38,7 +41,29 @@ func main() {
 			},
 		},
 		Action: func(c *cli.Context) error {
-			return nil
+			_, k, err := kube.GetKubeClient(c.String("context"))
+			if err != nil {
+				return errors.Wrap(err, "failed to create kube client")
+			}
+
+			d := proxier.NewDiscoverer(k, log)
+			p := proxier.NewProxier(k, log)
+
+			services, err := d.Discover(ctx)
+			if err != nil {
+				return errors.Wrap(err, "failed to discover services")
+			}
+
+			if len(services) == 0 {
+				log.Info("found no services, exiting ...")
+				return nil
+			}
+
+			if err := p.Add(services...); err != nil {
+				return errors.Wrap(err, "failed to add discovered services to proxy")
+			}
+
+			return errors.Wrap(p.Proxy(ctx), "failed to start proxier")
 		},
 	}
 
