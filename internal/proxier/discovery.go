@@ -18,7 +18,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
@@ -79,6 +78,11 @@ func (d *Discoverer) Discover(ctx context.Context) ([]Service, error) {
 		}
 
 		for _, kserv := range l.Items {
+			// In general we don't support non-clusterIP services
+			if kserv.Spec.ClusterIP == "None" {
+				continue
+			}
+
 			serv := Service{
 				Name:      kserv.Name,
 				Namespace: kserv.Namespace,
@@ -139,7 +143,6 @@ func (d *Discoverer) Discover(ctx context.Context) ([]Service, error) {
 				})
 			}
 
-			spew.Dump(serv)
 			s = append(s, serv)
 		}
 

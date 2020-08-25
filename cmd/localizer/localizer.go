@@ -17,6 +17,7 @@ import (
 	"context"
 	"os"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/jaredallard/localizer/internal/kube"
 	"github.com/jaredallard/localizer/internal/proxier"
 	"github.com/pkg/errors"
@@ -39,27 +40,59 @@ func main() {
 				Usage:   "Specify Kubernetes context to use",
 				EnvVars: []string{"KUBECONTEXT"},
 			},
+			&cli.StringSliceFlag{
+				Name:  "skip-app",
+				Usage: "Skip forwarding an application locally",
+			},
+			&cli.StringSliceFlag{
+				Name:  "skip-namespace",
+				Usage: "Skip forwarding to a namespace",
+			},
 		},
 		Action: func(c *cli.Context) error {
-			_, k, err := kube.GetKubeClient(c.String("context"))
+			kconf, k, err := kube.GetKubeClient(c.String("context"))
 			if err != nil {
 				return errors.Wrap(err, "failed to create kube client")
 			}
 
 			d := proxier.NewDiscoverer(k, log)
-			p := proxier.NewProxier(k, log)
+			p := proxier.NewProxier(k, kconf, log)
 
 			services, err := d.Discover(ctx)
 			if err != nil {
 				return errors.Wrap(err, "failed to discover services")
 			}
 
-			if len(services) == 0 {
+			nameFilterHM := make(map[string]bool)
+			for _, serv := range append(c.StringSlice("skip-app"), "kubernetes") {
+				nameFilterHM[serv] = true
+			}
+			namespaceFilterHM := make(map[string]bool)
+			for _, serv := range append(c.StringSlice("skip-namespace"), "kube-system") {
+				namespaceFilterHM[serv] = true
+			}
+
+			filteredServices := make([]proxier.Service, 0)
+			for _, serv := range services {
+				if nameFilterHM[serv.Name] {
+					continue
+				}
+
+				if namespaceFilterHM[serv.Namespace] {
+					continue
+				}
+
+				filteredServices = append(filteredServices, serv)
+			}
+
+			if len(filteredServices) == 0 {
 				log.Info("found no services, exiting ...")
 				return nil
 			}
 
-			if err := p.Add(services...); err != nil {
+			spew.Dump(filteredServices)
+
+			if err := p.Add(filteredServices...); err != nil {
 				return errors.Wrap(err, "failed to add discovered services to proxy")
 			}
 
