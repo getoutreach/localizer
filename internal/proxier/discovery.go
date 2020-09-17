@@ -23,6 +23,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/kubernetes"
 )
 
@@ -132,13 +133,36 @@ func (d *Discoverer) Discover(ctx context.Context) ([]Service, error) {
 					p.Name = strconv.Itoa(int(p.Port))
 				}
 
+				remotePort := 0
+				if p.TargetPort.Type == intstr.String {
+					// we need to resolve string type services
+					e, err := d.k.CoreV1().Endpoints(kserv.ObjectMeta.Namespace).Get(ctx, kserv.ObjectMeta.Name, metav1.GetOptions{})
+					if err != nil {
+						continue
+					}
+
+					if len(e.Subsets) == 0 {
+						continue
+					}
+
+					// iterate over the ports to find what
+					// the named port references
+					for _, np := range e.Subsets[0].Ports {
+						if np.Name == p.TargetPort.String() {
+							remotePort = int(np.Port)
+						}
+					}
+				} else {
+					remotePort = p.TargetPort.IntValue()
+				}
+
 				override := remaps[strings.ToLower(p.Name)]
 				if override != 0 {
 					localPort = override
 				}
 
 				serv.Ports = append(serv.Ports, &ServicePort{
-					RemotePort: uint(p.Port),
+					RemotePort: uint(remotePort),
 					LocalPort:  localPort,
 				})
 			}

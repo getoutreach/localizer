@@ -3,6 +3,7 @@ module github.com/jaredallard/localizer
 go 1.15
 
 require (
+	github.com/cenkalti/backoff/v4 v4.0.2
 	github.com/davecgh/go-spew v1.1.1
 	github.com/pkg/errors v0.8.1
 	github.com/sirupsen/logrus v1.6.0
