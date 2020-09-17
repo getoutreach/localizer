@@ -18,7 +18,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"os"
 	"sort"
 	"time"
 
@@ -99,7 +98,7 @@ func (pc *ProxyConnection) Start(ctx context.Context) error {
 	dialer := spdy.NewDialer(upgrader, &http.Client{Transport: transport}, "POST", req.URL())
 
 	pc.proxier.log.Debugf("creating port-forward: %s", pc.GetPort())
-	fw, err := portforward.New(dialer, []string{pc.GetPort()}, ctx.Done(), nil, ioutil.Discard, os.Stdout)
+	fw, err := portforward.New(dialer, []string{pc.GetPort()}, ctx.Done(), nil, ioutil.Discard, ioutil.Discard)
 	if err != nil {
 		return err
 	}
@@ -114,6 +113,9 @@ func (pc *ProxyConnection) Start(ctx context.Context) error {
 // no longer being active
 func (pc *ProxyConnection) Close() error {
 	pc.Active = false
+
+	// note: If the parent context was cancelled
+	// this has already been closed
 	pc.fw.Close()
 
 	// we'll return an error one day
@@ -415,6 +417,8 @@ func (p *Proxier) Proxy(ctx context.Context) error {
 	<-ctx.Done()
 	p.log.Info("cleaning up ...")
 
+	p.log.Debug("hosts file")
+	p.log.Debug(p.hosts.RenderHostsFile())
 	for k, s := range p.activeServices {
 		namespace, name, err := cache.SplitMetaNamespaceKey(k)
 		if err != nil {
@@ -429,11 +433,19 @@ func (p *Proxier) Proxy(ctx context.Context) error {
 
 		// cleanup the DNS entries
 		kserv := &corev1.Service{ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: namespace}}
-		p.hosts.RemoveAddresses(serviceAddresses(kserv))
+		addrs := serviceAddresses(kserv)
+
+		p.log.WithField("addresses", addrs).Debug("cleaning up hosts entry")
+		p.hosts.RemoveHosts(addrs)
 		if err := p.hosts.Save(); err != nil {
 			p.log.Warnf("failed to clean hosts file: %v", err)
 		}
 	}
+
+	p.log.Debug("hosts file after")
+	p.log.Debug(p.hosts.RenderHostsFile())
+
+	p.log.Info("cleaned up")
 
 	return nil
 }
