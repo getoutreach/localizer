@@ -25,8 +25,10 @@ import (
 	"github.com/cenkalti/backoff/v4"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+	"github.com/txn2/txeh"
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
@@ -41,7 +43,8 @@ import (
 // Proxier handles creating an maintaining proxies to a remote
 // Kubernetes service
 type Proxier struct {
-	k kubernetes.Interface
+	k     kubernetes.Interface
+	hosts *txeh.Hosts
 
 	// stores
 	podStore  cache.Store
@@ -119,8 +122,14 @@ func (pc *ProxyConnection) Close() error {
 
 // NewProxier creates a new proxier instance
 func NewProxier(k kubernetes.Interface, kconf *rest.Config, l logrus.FieldLogger) *Proxier {
+	hosts, err := txeh.NewHosts(&txeh.HostsConfig{})
+	if err != nil {
+		l.Fatalf("failed to open hosts file: %v", err)
+	}
+
 	return &Proxier{
 		k:     k,
+		hosts: hosts,
 		kconf: kconf,
 		rest:  k.CoreV1().RESTClient(),
 		log:   l,
@@ -129,6 +138,18 @@ func NewProxier(k kubernetes.Interface, kconf *rest.Config, l logrus.FieldLogger
 		active:         make(map[uint]*ProxyConnection),
 		activePods:     make(map[string][]*ProxyConnection),
 		activeServices: make(map[string][]*ProxyConnection),
+	}
+}
+
+// serviceAddresses returns all of the valid addresses
+// for a given kubernetes service
+func serviceAddresses(s *corev1.Service) []string {
+	return []string{
+		s.Name,
+		fmt.Sprintf("%s.%s", s.Name, s.Namespace),
+		fmt.Sprintf("%s.%s.svc", s.Name, s.Namespace),
+		fmt.Sprintf("%s.%s.svc.cluster", s.Name, s.Namespace),
+		fmt.Sprintf("%s.%s.svc.cluster.local", s.Name, s.Namespace),
 	}
 }
 
@@ -199,6 +220,11 @@ func (p *Proxier) handleInformerEvent(event string, obj interface{}) {
 
 		// reset the activeServices section for this service
 		p.activeServices[k] = nil
+
+		p.hosts.RemoveAddresses(serviceAddresses(obj.(*corev1.Service)))
+		if err := p.hosts.Save(); err != nil {
+			p.log.Warnf("failed to clean hosts file: %v", err)
+		}
 
 		if len(removedPorts) > 0 {
 			p.log.WithField("ports", removedPorts).
@@ -299,7 +325,8 @@ func (p *Proxier) createProxy(ctx context.Context, s *Service) error {
 
 	for _, port := range s.Ports {
 		if port.LocalPort <= 1024 {
-			return fmt.Errorf("pod requested a privledged port")
+			p.log.Warnf("skipping service '%s' port %d, privledged ports are not allowed", serviceKey, port.LocalPort)
+			continue
 		}
 
 		// ap stores the connections
@@ -355,16 +382,57 @@ func (p *Proxier) createProxy(ctx context.Context, s *Service) error {
 		}
 	}
 
+	// only add addresses for services we actually are routing to
+	if len(p.activeServices[serviceKey]) > 0 {
+		p.hosts.AddHosts("127.0.0.1", serviceAddresses(kserv))
+		if err := p.hosts.Save(); err != nil {
+			return errors.Wrap(err, "failed to save address to hosts")
+		}
+	}
+
 	return nil
 }
 
-// Proxy starts a proxier. The proxy thread is run in a go-routine
-// so it is safe to execute this function and continue.
+// Proxy starts a proxier.
 func (p *Proxier) Proxy(ctx context.Context) error {
 	for _, s := range p.s {
-		// TODO(jaredallard): Before GA we'll need to make
-		// sure that there is a cordinated backoff/retry system
-		p.createProxy(ctx, &s)
+		b := backoff.NewExponentialBackOff()
+		for {
+			// TODO: do we want to limit amount of time we wait?
+			if err := p.createProxy(ctx, &s); err != nil {
+				wait := b.NextBackOff()
+				p.log.Warnf("failed to create port-forward for '%s/%s': %v (retry in %s)", s.Namespace, s.Name, err, wait.String())
+
+				time.Sleep(wait)
+				continue
+			}
+
+			// if we didn't error, then we exit the loop
+			break
+		}
+	}
+
+	<-ctx.Done()
+	p.log.Info("cleaning up ...")
+
+	for k, s := range p.activeServices {
+		namespace, name, err := cache.SplitMetaNamespaceKey(k)
+		if err != nil {
+			// TODO: handle this
+			continue
+		}
+
+		// close the port-forwards
+		for _, pc := range s {
+			pc.Close()
+		}
+
+		// cleanup the DNS entries
+		kserv := &corev1.Service{ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: namespace}}
+		p.hosts.RemoveAddresses(serviceAddresses(kserv))
+		if err := p.hosts.Save(); err != nil {
+			p.log.Warnf("failed to clean hosts file: %v", err)
+		}
 	}
 
 	return nil
