@@ -27,7 +27,7 @@ import (
 
 func main() {
 	ctx := context.Background()
-	log := logrus.New().WithContext(ctx)
+	log := logrus.New()
 
 	app := cli.App{
 		Version: "1.0.0",
@@ -50,6 +50,11 @@ func main() {
 			},
 		},
 		Action: func(c *cli.Context) error {
+			if os.Getenv("LOG_LEVEL") == "debug" {
+				log.SetLevel(logrus.DebugLevel)
+				log.Debug("set logger to debug")
+			}
+
 			kconf, k, err := kube.GetKubeClient(c.String("context"))
 			if err != nil {
 				return errors.Wrap(err, "failed to create kube client")
@@ -57,6 +62,11 @@ func main() {
 
 			d := proxier.NewDiscoverer(k, log)
 			p := proxier.NewProxier(k, kconf, log)
+
+			log.Debug("waiting for caches to sync")
+			if err := p.Start(ctx); err != nil {
+				return errors.Wrap(err, "failed to start proxy informers")
+			}
 
 			services, err := d.Discover(ctx)
 			if err != nil {
