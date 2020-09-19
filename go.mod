@@ -13,3 +13,5 @@ require (
 	k8s.io/client-go v0.19.2
 	k8s.io/kubectl v0.19.2
 )
+
+replace k8s.io/client-go => github.com/jaredallard/client-go v0.0.0-20200919203213-e55c7f2b41ab

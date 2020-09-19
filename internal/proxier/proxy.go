@@ -18,7 +18,9 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"reflect"
 	"sort"
+	"sync"
 	"time"
 
 	"github.com/cenkalti/backoff/v4"
@@ -57,6 +59,7 @@ type Proxier struct {
 
 	// active{,services,Pods} are mapping indexes for
 	// ProxyConnections
+	connMutex      sync.Mutex
 	active         map[uint]*ProxyConnection
 	activeServices map[string][]*ProxyConnection
 	activePods     map[string][]*ProxyConnection
@@ -72,6 +75,8 @@ type ProxyConnection struct {
 
 	Service Service
 	Pod     corev1.Pod
+
+	Started time.Time
 
 	// Active denotes if this connection is active
 	// or not
@@ -97,7 +102,7 @@ func (pc *ProxyConnection) Start(ctx context.Context) error {
 	}
 	dialer := spdy.NewDialer(upgrader, &http.Client{Transport: transport}, "POST", req.URL())
 
-	pc.proxier.log.Debugf("creating port-forward: %s", pc.GetPort())
+	pc.proxier.log.WithField("port", pc.GetPort()).Debug("creating port-forward")
 	fw, err := portforward.New(dialer, []string{pc.GetPort()}, ctx.Done(), nil, ioutil.Discard, ioutil.Discard)
 	if err != nil {
 		return err
@@ -106,7 +111,20 @@ func (pc *ProxyConnection) Start(ctx context.Context) error {
 
 	pc.Active = true
 
-	return fw.ForwardPorts()
+	pc.Started = time.Now()
+	go func() {
+		// TODO(jaredallard): Figure out a way to better backoff errors here
+		if err := fw.ForwardPorts(); err != nil {
+			// if this dies, mark the connection as inactive for
+			// the connection reaper
+			pc.Close()
+
+			pc.proxier.log.WithField("port", pc.GetPort()).Debug("port-forward died")
+			pc.proxier.handleInformerEvent("connection-dead", pc)
+		}
+	}()
+
+	return nil
 }
 
 // Close closes the current proxy connection and marks it as
@@ -156,37 +174,64 @@ func serviceAddresses(s *corev1.Service) []string {
 }
 
 func (p *Proxier) handleInformerEvent(event string, obj interface{}) {
-	// we don't currently process add
-	if event == "add" {
-		return
-	}
-
 	item := ""
 	switch obj.(type) {
 	case *corev1.Pod:
 		item = "pod"
 	case *corev1.Service:
 		item = "service"
+	case *ProxyConnection:
+		item = "connection"
 	default:
 		// skip unknown types
+		p.log.WithFields(logrus.Fields{
+			"event": event,
+			"type":  reflect.TypeOf(obj).String(),
+		}).Debug("ignored event")
+		return
+	}
+
+	// we don't currently process add
+	if event == "add" {
+		// skip unknown types
+		p.log.WithFields(logrus.Fields{
+			"event": event,
+			"type":  reflect.TypeOf(obj).String(),
+		}).Debug("skipped event")
 		return
 	}
 
 	k, _ := cache.MetaNamespaceKeyFunc(obj)
-	p.log.WithField(item, k).Debugf("%s %s", item, event)
+	p.log.WithFields(logrus.Fields{
+		"item":  item,
+		"event": event,
+		"key":   k,
+	}).Debugf("got event")
 
 	switch item {
-	case "pod":
+	case "pod", "connection":
+		if item == "connection" {
+			// if the connection died, we assume that the pod was lost
+			// so, we mimic the pod dead event
+			pc := obj.(*ProxyConnection)
+			k, _ = cache.MetaNamespaceKeyFunc(&pc.Pod)
+			p.log.Infof("underlying connection died for %d (-> %s:%d)", pc.LocalPort, k, pc.RemotePort)
+		}
+
 		refreshServices := make([]Service, len(p.activePods[k]))
 		refreshPorts := make([]string, len(p.activePods[k]))
+
+		p.connMutex.Lock()
 		for i, pc := range p.activePods[k] {
 			refreshServices[i] = pc.Service
 			refreshPorts[i] = pc.GetPort()
 			pc.Close()
+			p.active[pc.LocalPort] = nil
 		}
 
 		// reset the activePods
 		p.activePods[k] = nil
+		p.connMutex.Unlock()
 
 		if len(refreshPorts) > 0 {
 			p.log.WithField("ports", refreshPorts).
@@ -215,13 +260,17 @@ func (p *Proxier) handleInformerEvent(event string, obj interface{}) {
 
 	case "service":
 		removedPorts := make([]string, len(p.activeServices[k]))
+
+		p.connMutex.Lock()
 		for i, pc := range p.activeServices[k] {
 			removedPorts[i] = pc.GetPort()
 			pc.Close()
+			p.active[pc.LocalPort] = nil
 		}
 
 		// reset the activeServices section for this service
 		p.activeServices[k] = nil
+		p.connMutex.Unlock()
 
 		p.hosts.RemoveAddresses(serviceAddresses(obj.(*corev1.Service)))
 		if err := p.hosts.Save(); err != nil {
@@ -338,8 +387,8 @@ func (p *Proxier) createProxy(ctx context.Context, s *Service) error {
 			// if it is, drop a log
 			if ap.Service.Name != s.Name && ap.Service.Namespace != s.Namespace {
 				p.log.Warnf(
-					"skipping port-forward for '%s/%s:%d', '%s/%s' is using that port already",
-					s.Namespace, s.Name, port.LocalPort, ap.Service.Namespace, ap.Service.Name,
+					"skipping port-forward for '%s:%d', '%s/%s' is using that port already",
+					serviceKey, port.LocalPort, ap.Service.Namespace, ap.Service.Name,
 				)
 			}
 
@@ -347,10 +396,11 @@ func (p *Proxier) createProxy(ctx context.Context, s *Service) error {
 			continue
 		}
 
-		p.log.Infof("creating port-forward '%s/%s:%d' -> '127.0.0.1:%d'", s.Namespace, s.Name, port.RemotePort, port.LocalPort)
+		p.log.Infof("creating port-forward '%s:%d' -> '127.0.0.1:%d'", serviceKey, port.RemotePort, port.LocalPort)
 
 		// build the linking tables
 		// port -> conn
+		p.connMutex.Lock()
 		p.active[port.LocalPort] = &ProxyConnection{
 			p,
 			nil,
@@ -374,18 +424,20 @@ func (p *Proxier) createProxy(ctx context.Context, s *Service) error {
 			p.activePods[podKey] = make([]*ProxyConnection, 0)
 		}
 		p.activePods[podKey] = append(p.activePods[podKey], conn)
+		p.connMutex.Unlock()
 
 		// start the proxy
 		if err := conn.Start(ctx); err != nil {
 			p.log.Errorf(
-				"failed to start proxy for '%s/%s:%d' -> ':%d': %v",
-				s.Namespace, s.Name, port.RemotePort, port.LocalPort, err,
+				"failed to start proxy for '%s:%d' -> ':%d': %v",
+				serviceKey, port.RemotePort, port.LocalPort, err,
 			)
 		}
 	}
 
 	// only add addresses for services we actually are routing to
 	if len(p.activeServices[serviceKey]) > 0 {
+		p.log.Debugf("adding hosts file entry for service '%s'", serviceKey)
 		p.hosts.AddHosts("127.0.0.1", serviceAddresses(kserv))
 		if err := p.hosts.Save(); err != nil {
 			return errors.Wrap(err, "failed to save address to hosts")
