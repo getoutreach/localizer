@@ -15,9 +15,12 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"os"
+	"os/signal"
+	"os/user"
+	"syscall"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/jaredallard/localizer/internal/kube"
 	"github.com/jaredallard/localizer/internal/proxier"
 	"github.com/pkg/errors"
@@ -26,7 +29,7 @@ import (
 )
 
 func main() {
-	ctx := context.Background()
+	ctx, cancel := context.WithCancel(context.Background())
 	log := logrus.New()
 
 	app := cli.App{
@@ -50,6 +53,22 @@ func main() {
 			},
 		},
 		Action: func(c *cli.Context) error {
+			u, err := user.Current()
+			if err != nil {
+				return errors.Wrap(err, "failed to get current user")
+			}
+
+			if u.Uid != "0" {
+				return fmt.Errorf("must be run as root/Administrator")
+			}
+
+			sigC := make(chan os.Signal)
+			signal.Notify(sigC, os.Interrupt, syscall.SIGTERM)
+			go func() {
+				<-sigC
+				cancel()
+			}()
+
 			if os.Getenv("LOG_LEVEL") == "debug" {
 				log.SetLevel(logrus.DebugLevel)
 				log.Debug("set logger to debug")
@@ -99,8 +118,6 @@ func main() {
 				log.Info("found no services, exiting ...")
 				return nil
 			}
-
-			spew.Dump(filteredServices)
 
 			if err := p.Add(filteredServices...); err != nil {
 				return errors.Wrap(err, "failed to add discovered services to proxy")
