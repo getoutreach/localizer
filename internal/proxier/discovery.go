@@ -150,6 +150,7 @@ func (d *Discoverer) Discover(ctx context.Context) ([]Service, error) {
 					for _, np := range e.Subsets[0].Ports {
 						if np.Name == p.TargetPort.String() {
 							remotePort = int(np.Port)
+							break
 						}
 					}
 				} else {

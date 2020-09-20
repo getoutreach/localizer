@@ -76,8 +76,6 @@ type ProxyConnection struct {
 	Service Service
 	Pod     corev1.Pod
 
-	Started time.Time
-
 	// Active denotes if this connection is active
 	// or not
 	Active bool
@@ -111,7 +109,6 @@ func (pc *ProxyConnection) Start(ctx context.Context) error {
 
 	pc.Active = true
 
-	pc.Started = time.Now()
 	go func() {
 		// TODO(jaredallard): Figure out a way to better backoff errors here
 		if err := fw.ForwardPorts(); err != nil {

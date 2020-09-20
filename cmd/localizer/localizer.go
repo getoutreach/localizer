@@ -19,18 +19,26 @@ import (
 	"os"
 	"os/signal"
 	"os/user"
+	"strconv"
+	"strings"
 	"syscall"
 
+	"github.com/jaredallard/localizer/internal/expose"
 	"github.com/jaredallard/localizer/internal/kube"
 	"github.com/jaredallard/localizer/internal/proxier"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 )
 
 func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	log := logrus.New()
+
+	var kconf *rest.Config
+	var k kubernetes.Interface
 
 	app := cli.App{
 		Version: "1.0.0",
@@ -51,8 +59,70 @@ func main() {
 				Name:  "skip-namespace",
 				Usage: "Skip forwarding to a namespace",
 			},
+			&cli.StringFlag{
+				Name:        "log-level",
+				Usage:       "Set the log level",
+				EnvVars:     []string{"LOG_LEVEL"},
+				DefaultText: "INFO",
+			},
 		},
-		Action: func(c *cli.Context) error {
+		Commands: []*cli.Command{
+			{
+				Name:        "expose",
+				Description: "Expose a local port to a remote service in Kubernetes",
+				Usage:       "expose <localPort>[:remotePort] <service>",
+				Action: func(c *cli.Context) error {
+					localPortStr := c.Args().Get(0)
+					remotePortStr := localPortStr
+					service := c.Args().Get(1)
+
+					if localPortStr == "" {
+						return fmt.Errorf("missing localPort")
+					}
+
+					if service == "" {
+						return fmt.Errorf("missing service")
+					}
+
+					serviceSplit := strings.Split(service, "/")
+					if len(serviceSplit) != 2 {
+						return fmt.Errorf("serviceName should be in the format: namespace/serviceName")
+					}
+
+					portSplit := strings.Split(localPortStr, ":")
+					if len(portSplit) > 2 {
+						return fmt.Errorf("localPort/remotePort was invalid, expected format: localPort[:remotePort], got '%v'", localPortStr)
+					}
+
+					if len(portSplit) == 2 {
+						localPortStr = portSplit[0]
+						localPortStr = portSplit[1]
+					}
+
+					localPort, err := strconv.ParseUint(localPortStr, 10, 0)
+					if err != nil {
+						return fmt.Errorf("localPort is not an unsigned integer")
+					}
+					remotePort, err := strconv.Atoi(remotePortStr)
+					if err != nil {
+						return fmt.Errorf("remotePort is not an unsigned integer")
+					}
+
+					e := expose.NewExposer(k, log)
+					if err := e.Start(ctx); err != nil {
+						return err
+					}
+
+					p, err := e.Expose(ctx, uint(localPort), uint(remotePort), serviceSplit[0], serviceSplit[1])
+					if err != nil {
+						return errors.Wrap(err, "failed to create reverse port-forward")
+					}
+
+					return p.Start(ctx)
+				},
+			},
+		},
+		Before: func(c *cli.Context) error {
 			u, err := user.Current()
 			if err != nil {
 				return errors.Wrap(err, "failed to get current user")
@@ -69,16 +139,19 @@ func main() {
 				cancel()
 			}()
 
-			if os.Getenv("LOG_LEVEL") == "debug" {
+			if strings.ToLower(c.String("log-level")) == "debug" {
 				log.SetLevel(logrus.DebugLevel)
 				log.Debug("set logger to debug")
 			}
 
-			kconf, k, err := kube.GetKubeClient(c.String("context"))
+			kconf, k, err = kube.GetKubeClient(c.String("context"))
 			if err != nil {
 				return errors.Wrap(err, "failed to create kube client")
 			}
 
+			return nil
+		},
+		Action: func(c *cli.Context) error {
 			d := proxier.NewDiscoverer(k, log)
 			p := proxier.NewProxier(k, kconf, log)
 
