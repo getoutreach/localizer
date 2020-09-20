@@ -2,6 +2,7 @@ package expose
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -13,6 +14,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
@@ -92,6 +94,32 @@ func (c *Client) getObjectReplicas(ctx context.Context, obj *corev1.ObjectRefere
 	}
 
 	return uint(scale.Spec.Replicas), nil
+}
+
+type patchUInt32Value struct {
+	Op    string `json:"op"`
+	Path  string `json:"path"`
+	Value uint   `json:"value"`
+}
+
+// scaleObject attempts to scale a given object in appsv1
+func (c *Client) scaleObject(ctx context.Context, obj *corev1.ObjectReference, replicas uint) error {
+	payload := []patchUInt32Value{{
+		Op:    "replace",
+		Path:  "/spec/replicas",
+		Value: replicas,
+	}}
+	payloadBytes, _ := json.Marshal(payload)
+	// TODO(jaredallard): I imagine this + "s" hack won't work for everything
+	req := c.k.AppsV1().RESTClient().Patch(types.JSONPatchType).Resource(obj.Kind + "s").
+		Namespace(obj.Namespace).Name(obj.Name).Body(payloadBytes)
+
+	c.log.WithField("url", req.URL().String()).Debug("setting replicas")
+	res := req.Do(ctx)
+	if res.Error() != nil {
+		return res.Error()
+	}
+	return nil
 }
 
 // getPodOwnerRef returns the first apps/v1 ref that a pod has, if it has one

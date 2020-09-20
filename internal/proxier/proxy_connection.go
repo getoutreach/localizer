@@ -47,6 +47,7 @@ func (pc *ProxyConnection) Start(ctx context.Context) error {
 			// if this dies, mark the connection as inactive for
 			// the connection reaper
 			pc.Close()
+			pc.fw = nil
 
 			pc.proxier.log.WithField("port", pc.GetPort()).Debug("port-forward died")
 			pc.proxier.handleInformerEvent("connection-dead", pc)
@@ -63,7 +64,9 @@ func (pc *ProxyConnection) Close() error {
 
 	// note: If the parent context was cancelled
 	// this has already been closed
-	pc.fw.Close()
+	if pc.fw != nil {
+		pc.fw.Close()
+	}
 
 	// we'll return an error one day
 	return nil

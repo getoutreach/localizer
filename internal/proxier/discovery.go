@@ -30,6 +30,11 @@ import (
 
 const (
 	RemapAnnotationPrefix = "localizer.jaredallard.github.com/remap-"
+
+	// This is used to support exposed services being "forwarded"
+	ExposedAnnotation = "localizer.jaredallard.github.com/exposed"
+
+	ExposedLocalPortAnnotation = "localizer.jaredallard.github.com/exposed-ports"
 )
 
 // Service represents a Service running in Kubernetes

@@ -2,12 +2,14 @@ package expose
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/jaredallard/localizer/internal/kube"
+	"github.com/jaredallard/localizer/internal/proxier"
 	"github.com/omrikiei/ktunnel/pkg/client"
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
@@ -69,11 +71,20 @@ func (p *ServiceForward) createServerPodAndTransport(ctx context.Context) (func(
 	}
 
 	// create a pod for our new expose service
+	exposedPortsJSON, err := json.Marshal(containerPorts)
+	if err != nil {
+		return func() {}, err
+	}
+
 	po, err := p.c.k.CoreV1().Pods(p.Namespace).Create(ctx, &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace:    p.Namespace,
 			GenerateName: "localizer-",
-			Labels:       p.Selector,
+			Annotations: map[string]string{
+				proxier.ExposedAnnotation:          "true",
+				proxier.ExposedLocalPortAnnotation: string(exposedPortsJSON),
+			},
+			Labels: p.Selector,
 		},
 		Spec: corev1.PodSpec{
 			RestartPolicy: corev1.RestartPolicyOnFailure,
@@ -190,11 +201,17 @@ func (p *ServiceForward) Start(ctx context.Context) error {
 	// scale down the other resources that powered this service
 	for _, o := range p.objects {
 		p.c.log.Infof("scaling %s from %d -> 0", o.GetKey(), o.Replicas)
+		if err := p.c.scaleObject(ctx, &o.ObjectReference, uint(0)); err != nil {
+			return errors.Wrap(err, "failed to scale down object")
+		}
 	}
 	defer func() {
 		// scale back up the resources that powered this service
 		for _, o := range p.objects {
 			p.c.log.Infof("scaling %s from 0 -> %d", o.GetKey(), o.Replicas)
+			if err := p.c.scaleObject(context.Background(), &o.ObjectReference, o.Replicas); err != nil {
+				p.c.log.WithError(err).Warn("failed to scale back up object")
+			}
 		}
 	}()
 
