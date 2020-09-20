@@ -3,9 +3,9 @@ package expose
 import (
 	"context"
 	"fmt"
-	"strings"
 	"time"
 
+	"github.com/jaredallard/localizer/internal/kube"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	appsv1 "k8s.io/api/apps/v1"
@@ -23,37 +23,6 @@ type Client struct {
 
 	podStore        cache.Store
 	replicaSetStore cache.Store
-}
-
-type Port struct {
-	c *Client
-
-	LocalPort  uint
-	RemotePort uint
-
-	// TODO(jaredallard): support replacing non associated pods?
-	objects map[string]scaledObjectType
-}
-
-// Start starts forwarding a port.
-func (p *Port) Start(ctx context.Context) error {
-	// scale down the other resources that powered this service
-	for _, o := range p.objects {
-		p.c.log.Infof("scaling %s from %d -> 0", o.GetKey(), o.Replicas)
-	}
-	return nil
-}
-
-type scaledObjectType struct {
-	corev1.ObjectReference
-
-	Replicas uint
-}
-
-// GetKey() returns a unique, predictable key for the given
-// scaledObjectType capable of being used for caching
-func (s *scaledObjectType) GetKey() string {
-	return strings.ToLower(fmt.Sprintf("%s/%s/%s", s.Kind, s.Namespace, s.Name))
 }
 
 // NewExposer returns a new client capable of exposing localports to remote locations
@@ -168,7 +137,16 @@ func (c *Client) getOwnerRefKey(ref *corev1.ObjectReference) string {
 
 // Expose exposed a port, localPort, on the local host, and opens a remote port
 // that can be accessed via the remote service at remotePort
-func (c *Client) Expose(ctx context.Context, localPort, remotePort uint, namespace, serviceName string) (*Port, error) {
+func (c *Client) Expose(ctx context.Context, ports []kube.ResolvedServicePort, namespace, serviceName string) (*ServiceForward, error) {
+	s, err := c.k.CoreV1().Services(namespace).Get(ctx, serviceName, metav1.GetOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	if len(s.Spec.Selector) == 0 {
+		return nil, fmt.Errorf("headless services are not supported")
+	}
+
 	e, err := c.k.CoreV1().Endpoints(namespace).Get(ctx, serviceName, metav1.GetOptions{})
 	if err != nil {
 		return nil, err
@@ -273,10 +251,11 @@ func (c *Client) Expose(ctx context.Context, localPort, remotePort uint, namespa
 		}
 	}
 
-	return &Port{
-		c:          c,
-		LocalPort:  localPort,
-		RemotePort: remotePort,
-		objects:    objects,
+	return &ServiceForward{
+		c:         c,
+		Namespace: namespace,
+		Selector:  s.Spec.Selector,
+		Ports:     ports,
+		objects:   objects,
 	}, nil
 }

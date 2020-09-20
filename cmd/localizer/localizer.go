@@ -19,7 +19,6 @@ import (
 	"os"
 	"os/signal"
 	"os/user"
-	"strconv"
 	"strings"
 	"syscall"
 
@@ -29,6 +28,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 )
@@ -68,18 +68,19 @@ func main() {
 		},
 		Commands: []*cli.Command{
 			{
-				Name:        "expose",
-				Description: "Expose a local port to a remote service in Kubernetes",
-				Usage:       "expose <localPort>[:remotePort] <service>",
+				Name:        "server",
+				Description: "Run a server that can be used with `expose`",
+				Usage:       "server",
 				Action: func(c *cli.Context) error {
-					localPortStr := c.Args().Get(0)
-					remotePortStr := localPortStr
-					service := c.Args().Get(1)
-
-					if localPortStr == "" {
-						return fmt.Errorf("missing localPort")
-					}
-
+					return nil
+				},
+			},
+			{
+				Name:        "expose",
+				Description: "Expose ports for a given service to Kubernetes",
+				Usage:       "expose <service>",
+				Action: func(c *cli.Context) error {
+					service := c.Args().Get(0)
 					if service == "" {
 						return fmt.Errorf("missing service")
 					}
@@ -89,23 +90,14 @@ func main() {
 						return fmt.Errorf("serviceName should be in the format: namespace/serviceName")
 					}
 
-					portSplit := strings.Split(localPortStr, ":")
-					if len(portSplit) > 2 {
-						return fmt.Errorf("localPort/remotePort was invalid, expected format: localPort[:remotePort], got '%v'", localPortStr)
-					}
-
-					if len(portSplit) == 2 {
-						localPortStr = portSplit[0]
-						localPortStr = portSplit[1]
-					}
-
-					localPort, err := strconv.ParseUint(localPortStr, 10, 0)
+					// discover the service's ports
+					s, err := k.CoreV1().Services(serviceSplit[0]).Get(ctx, serviceSplit[1], metav1.GetOptions{})
 					if err != nil {
-						return fmt.Errorf("localPort is not an unsigned integer")
+						return errors.Wrapf(err, "failed to get service '%s'", service)
 					}
-					remotePort, err := strconv.Atoi(remotePortStr)
+					servicePorts, err := kube.ResolveServicePorts(ctx, k, s)
 					if err != nil {
-						return fmt.Errorf("remotePort is not an unsigned integer")
+						return errors.Wrap(err, "failed to resolve service ports")
 					}
 
 					e := expose.NewExposer(k, log)
@@ -113,7 +105,7 @@ func main() {
 						return err
 					}
 
-					p, err := e.Expose(ctx, uint(localPort), uint(remotePort), serviceSplit[0], serviceSplit[1])
+					p, err := e.Expose(ctx, servicePorts, serviceSplit[0], serviceSplit[1])
 					if err != nil {
 						return errors.Wrap(err, "failed to create reverse port-forward")
 					}

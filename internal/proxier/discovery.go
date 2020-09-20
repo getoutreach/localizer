@@ -18,13 +18,14 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/jaredallard/localizer/internal/kube"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/cache"
 )
 
 const (
@@ -118,7 +119,14 @@ func (d *Discoverer) Discover(ctx context.Context) ([]Service, error) {
 
 			// convert the Kubernetes ports into our own internal data model
 			// we also handle overriding localPorts via the RemapAnnotation here.
-			for _, p := range kserv.Spec.Ports {
+			servicePorts, err := kube.ResolveServicePorts(ctx, d.k, &kserv)
+			if err != nil {
+				k, _ := cache.MetaNamespaceKeyFunc(kserv)
+				d.log.Debug("failed to process servicePorts for service %s: %v", k, err)
+				continue
+			}
+
+			for _, p := range servicePorts {
 				// we only support TCP services currently.
 				if p.Protocol != corev1.ProtocolTCP {
 					continue
@@ -133,29 +141,7 @@ func (d *Discoverer) Discover(ctx context.Context) ([]Service, error) {
 					p.Name = strconv.Itoa(int(p.Port))
 				}
 
-				remotePort := 0
-				if p.TargetPort.Type == intstr.String {
-					// we need to resolve string type services
-					e, err := d.k.CoreV1().Endpoints(kserv.ObjectMeta.Namespace).Get(ctx, kserv.ObjectMeta.Name, metav1.GetOptions{})
-					if err != nil {
-						continue
-					}
-
-					if len(e.Subsets) == 0 {
-						continue
-					}
-
-					// iterate over the ports to find what
-					// the named port references
-					for _, np := range e.Subsets[0].Ports {
-						if np.Name == p.TargetPort.String() {
-							remotePort = int(np.Port)
-							break
-						}
-					}
-				} else {
-					remotePort = p.TargetPort.IntValue()
-				}
+				remotePort := p.TargetPort.IntValue()
 
 				override := remaps[strings.ToLower(p.Name)]
 				if override != 0 {
