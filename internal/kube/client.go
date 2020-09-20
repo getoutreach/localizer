@@ -14,7 +14,12 @@
 package kube
 
 import (
+	"context"
+
 	"github.com/pkg/errors"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/kubernetes"
 
 	// Needed for external authenticators
@@ -52,4 +57,48 @@ func GetKubeClient(context string) (*rest.Config, kubernetes.Interface, error) {
 	}
 
 	return config, client, nil
+}
+
+type ResolvedServicePort struct {
+	corev1.ServicePort
+
+	// OriginalTargetPort is set if the ServicePort
+	// was modified
+	OriginalTargetPort string
+}
+
+// ResolveServicePorts converts named ports into their true
+// format. TargetPort's that have are named become their integer equivalents
+func ResolveServicePorts(ctx context.Context, k kubernetes.Interface, s *corev1.Service) ([]ResolvedServicePort, error) {
+	e, err := k.CoreV1().Endpoints(s.ObjectMeta.Namespace).Get(ctx, s.ObjectMeta.Name, metav1.GetOptions{})
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to get endpoints")
+	}
+
+	servicePorts := make([]ResolvedServicePort, len(s.Spec.Ports))
+	for i, p := range s.Spec.Ports {
+		original := ""
+		if p.TargetPort.Type == intstr.String {
+			if len(e.Subsets) == 0 {
+				continue
+			}
+
+			// iterate over the ports to find what
+			// the named port references
+			for _, np := range e.Subsets[0].Ports {
+				if np.Name == p.TargetPort.String() {
+					original = p.TargetPort.String()
+					p.TargetPort = intstr.FromInt(int(np.Port))
+					break
+				}
+			}
+		}
+
+		servicePorts[i] = ResolvedServicePort{
+			p,
+			original,
+		}
+	}
+
+	return servicePorts, nil
 }

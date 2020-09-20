@@ -466,8 +466,6 @@ func (p *Proxier) Proxy(ctx context.Context) error {
 	<-ctx.Done()
 	p.log.Info("cleaning up ...")
 
-	p.log.Debug("hosts file")
-	p.log.Debug(p.hosts.RenderHostsFile())
 	for k, s := range p.activeServices {
 		namespace, name, err := cache.SplitMetaNamespaceKey(k)
 		if err != nil {
@@ -490,9 +488,6 @@ func (p *Proxier) Proxy(ctx context.Context) error {
 			p.log.Warnf("failed to clean hosts file: %v", err)
 		}
 	}
-
-	p.log.Debug("hosts file after")
-	p.log.Debug(p.hosts.RenderHostsFile())
 
 	p.log.Info("cleaned up")
 
