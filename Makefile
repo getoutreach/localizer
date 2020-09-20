@@ -54,6 +54,11 @@ gobuild:
 	mkdir -p $(BINDIR)
 	GOPROXY=$(GOPROXY) CGO_ENABLED=$(CGO_ENABLED) $(GO) build -o $(BINDIR)/ -ldflags "$(LDFLAGS)" $(GO_EXTRA_FLAGS) $(PKGDIR)/...
 
+.PHONY: docker-build-push
+docker-build-push:
+	@echo "Building and push docker image"
+	docker buildx build --platform linux/amd64,linux/arm64 -t "jaredallard/localizer:latest" --push .
+
 .PHONY: fmt
 fmt:
 	@echo " :: Running goimports"

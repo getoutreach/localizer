@@ -15,17 +15,21 @@ package kube
 
 import (
 	"context"
+	"io/ioutil"
+	"net/http"
 
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/transport/spdy"
 
 	// Needed for external authenticators
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
 	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/client-go/tools/portforward"
 
 	"k8s.io/client-go/rest"
 )
@@ -33,22 +37,26 @@ import (
 // GetKubeClient returns a kubernetes client, and the config used by it, based on
 // a given context. If no context is provided then the default will be used
 func GetKubeClient(context string) (*rest.Config, kubernetes.Interface, error) {
-	lr := clientcmd.NewDefaultClientConfigLoadingRules()
-	apiconfig, err := lr.Load()
+	// attempt to use in cluster config first
+	config, err := rest.InClusterConfig()
 	if err != nil {
-		return nil, nil, err
-	}
+		lr := clientcmd.NewDefaultClientConfigLoadingRules()
+		apiconfig, err := lr.Load()
+		if err != nil {
+			return nil, nil, err
+		}
 
-	overrides := &clientcmd.ConfigOverrides{}
-	if context != "" {
-		overrides.CurrentContext = context
-	}
+		overrides := &clientcmd.ConfigOverrides{}
+		if context != "" {
+			overrides.CurrentContext = context
+		}
 
-	ccc := clientcmd.NewDefaultClientConfig(*apiconfig, overrides)
+		ccc := clientcmd.NewDefaultClientConfig(*apiconfig, overrides)
 
-	config, err := ccc.ClientConfig()
-	if err != nil {
-		return nil, nil, errors.Wrap(err, "failed to get kubernetes client config")
+		config, err = ccc.ClientConfig()
+		if err != nil {
+			return nil, nil, errors.Wrap(err, "failed to get kubernetes client config")
+		}
 	}
 
 	client, err := kubernetes.NewForConfig(config)
@@ -57,6 +65,22 @@ func GetKubeClient(context string) (*rest.Config, kubernetes.Interface, error) {
 	}
 
 	return config, client, nil
+}
+
+func CreatePortForward(ctx context.Context, r rest.Interface, rc *rest.Config, p *corev1.Pod, port string) (*portforward.PortForwarder, error) {
+	req := r.Post().
+		Resource("pods").
+		Namespace(p.Namespace).
+		Name(p.Name).
+		SubResource("portforward")
+
+	transport, upgrader, err := spdy.RoundTripperFor(rc)
+	if err != nil {
+		return nil, err
+	}
+	dialer := spdy.NewDialer(upgrader, &http.Client{Transport: transport}, "POST", req.URL())
+
+	return portforward.New(dialer, []string{port}, ctx.Done(), nil, ioutil.Discard, ioutil.Discard)
 }
 
 type ResolvedServicePort struct {

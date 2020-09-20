@@ -14,21 +14,24 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
 )
 
 type Client struct {
-	k   kubernetes.Interface
-	log logrus.FieldLogger
+	k     kubernetes.Interface
+	kconf *rest.Config
+	log   logrus.FieldLogger
 
 	podStore        cache.Store
 	replicaSetStore cache.Store
 }
 
 // NewExposer returns a new client capable of exposing localports to remote locations
-func NewExposer(k kubernetes.Interface, log logrus.FieldLogger) *Client {
+func NewExposer(k kubernetes.Interface, kconf *rest.Config, log logrus.FieldLogger) *Client {
 	return &Client{
 		k,
+		kconf,
 		log,
 		nil,
 		nil,
@@ -153,6 +156,11 @@ func (c *Client) Expose(ctx context.Context, ports []kube.ResolvedServicePort, n
 	}
 
 	objects := make(map[string]scaledObjectType)
+
+	if len(e.Subsets) == 0 {
+		// TODO(jaredallard): If no endpoints, then we can just drop it
+		return nil, fmt.Errorf("failed to find any endpoints for this service")
+	}
 
 	c.log.Debugf("found %d subsets", len(e.Subsets))
 	for _, s := range e.Subsets {

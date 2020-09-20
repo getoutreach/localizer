@@ -16,6 +16,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"os"
 	"os/signal"
 	"os/user"
@@ -25,6 +26,7 @@ import (
 	"github.com/jaredallard/localizer/internal/expose"
 	"github.com/jaredallard/localizer/internal/kube"
 	"github.com/jaredallard/localizer/internal/proxier"
+	"github.com/omrikiei/ktunnel/pkg/server"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
@@ -72,7 +74,17 @@ func main() {
 				Description: "Run a server that can be used with `expose`",
 				Usage:       "server",
 				Action: func(c *cli.Context) error {
-					return nil
+					go func() {
+						if err := http.ListenAndServe(":51", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { fmt.Fprintln(w, "ready") })); err != nil {
+							log.WithError(err).Fatal("failed to start readiness prob server")
+						}
+					}()
+
+					// note: port 50 is chosen as least likely to collide with anything
+					// we may want to look into randomizing it in the future
+					port := 50
+					tls := false
+					return errors.Wrap(server.RunServer(ctx, &port, &tls, nil, nil), "server failed")
 				},
 			},
 			{
@@ -100,7 +112,7 @@ func main() {
 						return errors.Wrap(err, "failed to resolve service ports")
 					}
 
-					e := expose.NewExposer(k, log)
+					e := expose.NewExposer(k, kconf, log)
 					if err := e.Start(ctx); err != nil {
 						return err
 					}

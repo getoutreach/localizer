@@ -16,8 +16,6 @@ package proxier
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
-	"net/http"
 	"reflect"
 	"sort"
 	"sync"
@@ -35,8 +33,6 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/client-go/tools/portforward"
-	"k8s.io/client-go/transport/spdy"
 	"k8s.io/kubectl/pkg/polymorphichelpers"
 	"k8s.io/kubectl/pkg/util/podutils"
 )
@@ -63,78 +59,6 @@ type Proxier struct {
 	active         map[uint]*ProxyConnection
 	activeServices map[string][]*ProxyConnection
 	activePods     map[string][]*ProxyConnection
-}
-
-// ProxyConnection tracks a proxy connection
-type ProxyConnection struct {
-	proxier *Proxier
-	fw      *portforward.PortForwarder
-
-	LocalPort  uint
-	RemotePort uint
-
-	Service Service
-	Pod     corev1.Pod
-
-	// Active denotes if this connection is active
-	// or not
-	Active bool
-}
-
-// GetPort returns the port as a string local:remote
-func (pc *ProxyConnection) GetPort() string {
-	return fmt.Sprintf("%d:%d", pc.LocalPort, pc.RemotePort)
-}
-
-// Start starts a proxy connection
-func (pc *ProxyConnection) Start(ctx context.Context) error {
-	req := pc.proxier.rest.Post().
-		Resource("pods").
-		Namespace(pc.Pod.Namespace).
-		Name(pc.Pod.Name).
-		SubResource("portforward")
-
-	transport, upgrader, err := spdy.RoundTripperFor(pc.proxier.kconf)
-	if err != nil {
-		return err
-	}
-	dialer := spdy.NewDialer(upgrader, &http.Client{Transport: transport}, "POST", req.URL())
-
-	pc.proxier.log.WithField("port", pc.GetPort()).Debug("creating port-forward")
-	fw, err := portforward.New(dialer, []string{pc.GetPort()}, ctx.Done(), nil, ioutil.Discard, ioutil.Discard)
-	if err != nil {
-		return err
-	}
-	pc.fw = fw
-
-	pc.Active = true
-
-	go func() {
-		// TODO(jaredallard): Figure out a way to better backoff errors here
-		if err := fw.ForwardPorts(); err != nil {
-			// if this dies, mark the connection as inactive for
-			// the connection reaper
-			pc.Close()
-
-			pc.proxier.log.WithField("port", pc.GetPort()).Debug("port-forward died")
-			pc.proxier.handleInformerEvent("connection-dead", pc)
-		}
-	}()
-
-	return nil
-}
-
-// Close closes the current proxy connection and marks it as
-// no longer being active
-func (pc *ProxyConnection) Close() error {
-	pc.Active = false
-
-	// note: If the parent context was cancelled
-	// this has already been closed
-	pc.fw.Close()
-
-	// we'll return an error one day
-	return nil
 }
 
 // NewProxier creates a new proxier instance
