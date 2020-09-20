@@ -36,7 +36,7 @@ import (
 
 // GetKubeClient returns a kubernetes client, and the config used by it, based on
 // a given context. If no context is provided then the default will be used
-func GetKubeClient(context string) (*rest.Config, kubernetes.Interface, error) {
+func GetKubeClient(contextName string) (*rest.Config, kubernetes.Interface, error) {
 	// attempt to use in cluster config first
 	config, err := rest.InClusterConfig()
 	if err != nil {
@@ -47,8 +47,8 @@ func GetKubeClient(context string) (*rest.Config, kubernetes.Interface, error) {
 		}
 
 		overrides := &clientcmd.ConfigOverrides{}
-		if context != "" {
-			overrides.CurrentContext = context
+		if contextName != "" {
+			overrides.CurrentContext = contextName
 		}
 
 		ccc := clientcmd.NewDefaultClientConfig(*apiconfig, overrides)
@@ -67,7 +67,8 @@ func GetKubeClient(context string) (*rest.Config, kubernetes.Interface, error) {
 	return config, client, nil
 }
 
-func CreatePortForward(ctx context.Context, r rest.Interface, rc *rest.Config, p *corev1.Pod, port string) (*portforward.PortForwarder, error) {
+func CreatePortForward(ctx context.Context, r rest.Interface, rc *rest.Config,
+	p *corev1.Pod, port string) (*portforward.PortForwarder, error) {
 	req := r.Post().
 		Resource("pods").
 		Namespace(p.Namespace).
@@ -93,7 +94,8 @@ type ResolvedServicePort struct {
 
 // ResolveServicePorts converts named ports into their true
 // format. TargetPort's that have are named become their integer equivalents
-func ResolveServicePorts(ctx context.Context, k kubernetes.Interface, s *corev1.Service) ([]ResolvedServicePort, error) {
+func ResolveServicePorts(ctx context.Context, k kubernetes.Interface,
+	s *corev1.Service) ([]ResolvedServicePort, error) {
 	e, err := k.CoreV1().Endpoints(s.ObjectMeta.Namespace).Get(ctx, s.ObjectMeta.Name, metav1.GetOptions{})
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get endpoints")

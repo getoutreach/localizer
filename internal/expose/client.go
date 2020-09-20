@@ -138,7 +138,7 @@ func (c *Client) scaleObject(ctx context.Context, obj *corev1.ObjectReference, r
 // getPodOwnerRef returns the first apps/v1 ref that a pod has, if it has one
 // if no error is returned and nref is nil then it can be assumed that this
 // pod has no owner
-func (c *Client) getPodOwnerRef(ctx context.Context, ref *corev1.ObjectReference) (nref *corev1.ObjectReference, err error) {
+func (c *Client) getPodOwnerRef(ref *corev1.ObjectReference) (nref *corev1.ObjectReference, err error) {
 	// lookup the replicaset's parent deployment, if
 	// it has one.
 	k := c.getOwnerRefKey(ref)
@@ -181,7 +181,7 @@ func (c *Client) getOwnerRefKey(ref *corev1.ObjectReference) string {
 
 // Expose exposed a port, localPort, on the local host, and opens a remote port
 // that can be accessed via the remote service at remotePort
-func (c *Client) Expose(ctx context.Context, ports []kube.ResolvedServicePort, namespace, serviceName string) (*ServiceForward, error) {
+func (c *Client) Expose(ctx context.Context, ports []kube.ResolvedServicePort, namespace, serviceName string) (*ServiceForward, error) { //nolint:funlen,gocyclo,lll
 	s, err := c.k.CoreV1().Services(namespace).Get(ctx, serviceName, metav1.GetOptions{})
 	if err != nil {
 		return nil, err
@@ -223,7 +223,7 @@ func (c *Client) Expose(ctx context.Context, ports []kube.ResolvedServicePort, n
 				continue
 			}
 
-			podOwner, err := c.getPodOwnerRef(ctx, a.TargetRef)
+			podOwner, err := c.getPodOwnerRef(a.TargetRef)
 			if err != nil {
 				return nil, errors.Wrap(err, "failed to calculate owner of a pod")
 			}

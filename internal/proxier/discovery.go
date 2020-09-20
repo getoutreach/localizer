@@ -68,7 +68,7 @@ func NewDiscoverer(k kubernetes.Interface, l logrus.FieldLogger) *Discoverer {
 
 // Discover finds services in a Kubernetes cluster and returns ones that
 // should be forwarded locally.
-func (d *Discoverer) Discover(ctx context.Context) ([]Service, error) {
+func (d *Discoverer) Discover(ctx context.Context) ([]Service, error) { //nolint:funlen,gocyclo
 	cont := ""
 
 	s := make([]Service, 0)
@@ -84,7 +84,7 @@ func (d *Discoverer) Discover(ctx context.Context) ([]Service, error) {
 			return nil, errors.Wrap(err, "failed to retrieve kubernetes services")
 		}
 
-		for _, kserv := range l.Items {
+		for _, kserv := range l.Items { //nolint:gocritic
 			// In general we don't support non-clusterIP services
 			if kserv.Spec.ClusterIP == "None" {
 				continue
@@ -124,7 +124,7 @@ func (d *Discoverer) Discover(ctx context.Context) ([]Service, error) {
 
 			// convert the Kubernetes ports into our own internal data model
 			// we also handle overriding localPorts via the RemapAnnotation here.
-			servicePorts, err := kube.ResolveServicePorts(ctx, d.k, &kserv)
+			servicePorts, err := kube.ResolveServicePorts(ctx, d.k, &kserv) //nolint:scopelint
 			if err != nil {
 				k, _ := cache.MetaNamespaceKeyFunc(kserv)
 				d.log.Debug("failed to process servicePorts for service %s: %v", k, err)

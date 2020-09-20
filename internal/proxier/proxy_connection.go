@@ -75,7 +75,7 @@ func (pc *ProxyConnection) Start(ctx context.Context) error {
 func (pc *ProxyConnection) Close() error {
 	pc.Active = false
 
-	// note: If the parent context was cancelled
+	// note: If the parent context was canceled
 	// this has already been closed
 	if pc.fw != nil {
 		pc.fw.Close()

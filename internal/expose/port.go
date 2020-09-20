@@ -61,7 +61,7 @@ func (p *ServiceForward) createServerPortForward(ctx context.Context, po *corev1
 	return kube.CreatePortForward(ctx, p.c.k.CoreV1().RESTClient(), p.c.kconf, po, "50:50")
 }
 
-func (p *ServiceForward) createServerPodAndTransport(ctx context.Context) (func(), error) {
+func (p *ServiceForward) createServerPodAndTransport(ctx context.Context) (func(), error) { //nolint:funlen,gocyclo
 	// map the service ports into containerPorts, using the
 	containerPorts := make([]corev1.ContainerPort, len(p.Ports))
 	for i, port := range p.Ports {

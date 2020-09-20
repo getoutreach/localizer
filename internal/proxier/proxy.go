@@ -26,7 +26,6 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/txn2/txeh"
 	corev1 "k8s.io/api/core/v1"
-	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -94,7 +93,7 @@ func serviceAddresses(s *corev1.Service) []string {
 	}
 }
 
-func (p *Proxier) handleInformerEvent(event string, obj interface{}) {
+func (p *Proxier) handleInformerEvent(event string, obj interface{}) { //nolint:funlen,gocyclo
 	item := ""
 	switch obj.(type) {
 	case *corev1.Pod:
@@ -163,7 +162,7 @@ func (p *Proxier) handleInformerEvent(event string, obj interface{}) {
 			b := backoff.NewExponentialBackOff()
 			for {
 				// TODO: do we want to limit amount of time we wait?
-				if err := p.createProxy(context.TODO(), &s); err != nil {
+				if err := p.createProxy(context.TODO(), &s); err != nil { //nolint:scopelint
 					wait := b.NextBackOff()
 					p.log.Warnf("failed to refresh port-forward for %s: %v (trying again in %s)", k, err, wait.String())
 
@@ -208,7 +207,7 @@ func (p *Proxier) handleInformerEvent(event string, obj interface{}) {
 // Start starts the internal informer
 func (p *Proxier) Start(ctx context.Context) error {
 	podStore, podInformer := cache.NewInformer(
-		cache.NewListWatchFromClient(p.k.CoreV1().RESTClient(), "pods", v1.NamespaceAll, fields.Everything()),
+		cache.NewListWatchFromClient(p.k.CoreV1().RESTClient(), "pods", corev1.NamespaceAll, fields.Everything()),
 		&corev1.Pod{},
 		time.Second*0,
 		cache.ResourceEventHandlerFuncs{
@@ -222,7 +221,7 @@ func (p *Proxier) Start(ctx context.Context) error {
 	)
 
 	servStore, servInformer := cache.NewInformer(
-		cache.NewListWatchFromClient(p.k.CoreV1().RESTClient(), "services", v1.NamespaceAll, fields.Everything()),
+		cache.NewListWatchFromClient(p.k.CoreV1().RESTClient(), "services", corev1.NamespaceAll, fields.Everything()),
 		&corev1.Service{},
 		time.Second*0,
 		cache.ResourceEventHandlerFuncs{
@@ -270,7 +269,7 @@ func (p *Proxier) findPodBySelector(o runtime.Object) (*corev1.Pod, error) {
 }
 
 // createProxy creates a proxy connection
-func (p *Proxier) createProxy(ctx context.Context, s *Service) error {
+func (p *Proxier) createProxy(ctx context.Context, s *Service) error { //nolint:funlen,gocyclo
 	item, exists, err := p.servStore.GetByKey(fmt.Sprintf("%s/%s", s.Namespace, s.Name))
 	if err != nil {
 		p.log.Errorf("failed to get service: %v", err)
@@ -412,7 +411,7 @@ func (p *Proxier) Proxy(ctx context.Context) error {
 		b := backoff.NewExponentialBackOff()
 		for {
 			// TODO: do we want to limit amount of time we wait?
-			if err := p.createProxy(ctx, &s); err != nil {
+			if err := p.createProxy(ctx, &s); err != nil { //nolint:scopelint
 				wait := b.NextBackOff()
 				p.log.Warnf("failed to create port-forward for '%s/%s': %v (retry in %s)", s.Namespace, s.Name, err, wait.String())
 

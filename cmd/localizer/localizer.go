@@ -35,7 +35,7 @@ import (
 	"k8s.io/client-go/rest"
 )
 
-func main() {
+func main() { //nolint:funlen,gocyclo
 	ctx, cancel := context.WithCancel(context.Background())
 	log := logrus.New()
 
@@ -75,7 +75,11 @@ func main() {
 				Usage:       "server",
 				Action: func(c *cli.Context) error {
 					go func() {
-						if err := http.ListenAndServe(":51", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { fmt.Fprintln(w, "ready") })); err != nil {
+						if err := http.ListenAndServe(":51",
+							http.HandlerFunc(
+								func(w http.ResponseWriter, r *http.Request) { fmt.Fprintln(w, "ready") },
+							),
+						); err != nil {
 							log.WithError(err).Fatal("failed to start readiness prob server")
 						}
 					}()
@@ -143,7 +147,7 @@ func main() {
 				cancel()
 			}()
 
-			if strings.ToLower(c.String("log-level")) == "debug" {
+			if strings.EqualFold(c.String("log-level"), "debug") {
 				log.SetLevel(logrus.DebugLevel)
 				log.Debug("set logger to debug")
 			}
