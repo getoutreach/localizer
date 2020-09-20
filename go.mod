@@ -3,9 +3,7 @@ module github.com/jaredallard/localizer
 go 1.15
 
 require (
-	github.com/cenkalti/backoff v2.2.1+incompatible
 	github.com/cenkalti/backoff/v4 v4.0.2
-	github.com/evanphx/json-patch v4.9.0+incompatible
 	github.com/omrikiei/ktunnel v1.2.8-beta.0.20200903140414-c553ba6656ef
 	github.com/pkg/errors v0.9.1
 	github.com/sirupsen/logrus v1.6.0
