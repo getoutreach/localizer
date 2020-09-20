@@ -35,7 +35,7 @@ fi
 
 # TODO(jaredallard): enable golangci-lint
 info "Running $(basename "$LINTER" .sh)"
-"$LINTER" run --build-tags "$TEST_TAGS" ./...
+"$LINTER" run --build-tags "$TEST_TAGS" --timeout 10m ./...
 
 info "Running go test ($TEST_TAGS)"
 # Why: We want these to split.
