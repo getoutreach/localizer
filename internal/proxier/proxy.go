@@ -61,7 +61,6 @@ type Proxier struct {
 	// active{,services,Pods} are mapping indexes for
 	// ProxyConnections
 	connMutex      sync.Mutex
-	active         map[uint]*ProxyConnection
 	serviceIPs     map[string]*ipam.IP
 	activeServices map[string][]*ProxyConnection
 	activePods     map[string][]*ProxyConnection
@@ -96,7 +95,6 @@ func NewProxier(k kubernetes.Interface, kconf *rest.Config, l logrus.FieldLogger
 		ipam:       ipamInstance,
 		ipamPrefix: prefix,
 
-		active:         make(map[uint]*ProxyConnection),
 		serviceIPs:     make(map[string]*ipam.IP),
 		activePods:     make(map[string][]*ProxyConnection),
 		activeServices: make(map[string][]*ProxyConnection),
@@ -115,7 +113,7 @@ func serviceAddresses(s *corev1.Service) []string {
 	}
 }
 
-func (p *Proxier) handleInformerEvent(event string, obj interface{}) { //nolint:funlen,gocyclo
+func (p *Proxier) handleInformerEvent(ctx context.Context, event string, obj interface{}) { //nolint:funlen,gocyclo
 	item := ""
 	switch obj.(type) {
 	case *corev1.Pod:
@@ -168,7 +166,6 @@ func (p *Proxier) handleInformerEvent(event string, obj interface{}) { //nolint:
 			refreshServices[i] = pc.Service
 			refreshPorts[i] = pc.GetPort()
 			pc.Close()
-			p.active[pc.LocalPort] = nil
 		}
 
 		// reset the activePods
@@ -181,23 +178,21 @@ func (p *Proxier) handleInformerEvent(event string, obj interface{}) { //nolint:
 		}
 
 		for _, s := range refreshServices {
-			b := backoff.NewExponentialBackOff()
+			ticker := backoff.NewTicker(backoff.NewExponentialBackOff())
 			for {
-				// TODO: do we want to limit amount of time we wait?
-				if err := p.createProxy(context.TODO(), &s); err != nil { //nolint:scopelint
-					wait := b.NextBackOff()
-					p.log.Warnf("failed to refresh port-forward for %s: %v (trying again in %s)", k, err, wait.String())
-
-					time.Sleep(wait)
-					continue
+				select {
+				case <-ticker.C:
+					if err := p.createProxy(ctx, &s); err != nil { //nolint:scopelint
+						p.log.Warnf("failed to refresh port-forward for %s: %v (trying again)", k, err)
+					}
+					ticker.Stop()
+					p.log.WithField("ports", refreshPorts).
+						Infof("refreshed port-forward(s) for '%s'", k)
+					return
+				case <-ctx.Done():
+					return
 				}
-
-				// if we didn't error, then we exit the loop
-				break
 			}
-
-			p.log.WithField("ports", refreshPorts).
-				Infof("refreshed port-forward(s) for '%s'", k)
 		}
 
 	case "service":
@@ -207,7 +202,6 @@ func (p *Proxier) handleInformerEvent(event string, obj interface{}) { //nolint:
 		for i, pc := range p.activeServices[k] {
 			removedPorts[i] = pc.GetPort()
 			pc.Close()
-			p.active[pc.LocalPort] = nil
 		}
 
 		// reset the activeServices section for this service
@@ -234,10 +228,10 @@ func (p *Proxier) Start(ctx context.Context) error {
 		time.Second*0,
 		cache.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
-				p.handleInformerEvent("add", obj)
+				p.handleInformerEvent(ctx, "add", obj)
 			},
 			DeleteFunc: func(obj interface{}) {
-				p.handleInformerEvent("delete", obj)
+				p.handleInformerEvent(ctx, "delete", obj)
 			},
 		},
 	)
@@ -248,10 +242,10 @@ func (p *Proxier) Start(ctx context.Context) error {
 		time.Second*0,
 		cache.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
-				p.handleInformerEvent("add", obj)
+				p.handleInformerEvent(ctx, "add", obj)
 			},
 			DeleteFunc: func(obj interface{}) {
-				p.handleInformerEvent("delete", obj)
+				p.handleInformerEvent(ctx, "delete", obj)
 			},
 		},
 	)
@@ -318,7 +312,7 @@ func (p *Proxier) createProxy(ctx context.Context, s *Service) error { //nolint:
 		p.log.Debug("found exposed pod, faking port-forward")
 
 		for _, port := range s.Ports {
-			p.active[port.LocalPort] = &ProxyConnection{
+			conn := &ProxyConnection{
 				p,
 				nil,
 				nil,
@@ -329,7 +323,7 @@ func (p *Proxier) createProxy(ctx context.Context, s *Service) error { //nolint:
 				true,
 			}
 
-			conn := p.active[port.LocalPort]
+			p.connMutex.Lock()
 			if p.activeServices[serviceKey] == nil {
 				p.activeServices[serviceKey] = make([]*ProxyConnection, 0)
 			}
@@ -340,6 +334,7 @@ func (p *Proxier) createProxy(ctx context.Context, s *Service) error { //nolint:
 				p.activePods[podKey] = make([]*ProxyConnection, 0)
 			}
 			p.activePods[podKey] = append(p.activePods[podKey], conn)
+			p.connMutex.Unlock()
 		}
 
 		p.hosts.AddHosts("127.0.0.1", serviceAddresses(kserv))
@@ -375,28 +370,12 @@ func (p *Proxier) createProxy(ctx context.Context, s *Service) error { //nolint:
 			continue
 		}
 
-		// ap stores the connections
-		ap := p.active[port.LocalPort]
-		if ap != nil && ap.Active {
-			// Check if a different service than us is using that port already
-			// if it is, drop a log
-			if ap.Service.Name != s.Name && ap.Service.Namespace != s.Namespace {
-				p.log.Warnf(
-					"skipping port-forward for '%s:%d', '%s/%s' is using that port already",
-					serviceKey, port.LocalPort, ap.Service.Namespace, ap.Service.Name,
-				)
-			}
-
-			// skip ports that are already in use
-			continue
-		}
-
 		p.log.Infof("creating port-forward '%s:%d'", serviceKey, port.RemotePort)
 
 		// build the linking tables
 		// port -> conn
 		p.connMutex.Lock()
-		p.active[port.LocalPort] = &ProxyConnection{
+		conn := &ProxyConnection{
 			p,
 			nil,
 
@@ -407,7 +386,6 @@ func (p *Proxier) createProxy(ctx context.Context, s *Service) error { //nolint:
 			*pod,
 			false,
 		}
-		conn := p.active[port.LocalPort]
 
 		// service -> []Conn
 		if p.activeServices[serviceKey] == nil {
@@ -425,7 +403,7 @@ func (p *Proxier) createProxy(ctx context.Context, s *Service) error { //nolint:
 		// start the proxy
 		if err := conn.Start(ctx); err != nil {
 			p.log.Errorf(
-				"failed to start proxy for '%s:%d' -> ':%d': %v",
+				"failed to start proxy for '%s:%d'",
 				serviceKey, port.RemotePort, port.LocalPort, err,
 			)
 		}
@@ -443,20 +421,21 @@ func (p *Proxier) createProxy(ctx context.Context, s *Service) error { //nolint:
 
 // Proxy starts a proxier.
 func (p *Proxier) Proxy(ctx context.Context) error {
+createLoop:
 	for _, s := range p.s {
-		b := backoff.NewExponentialBackOff()
+		ticker := backoff.NewTicker(backoff.NewExponentialBackOff())
+	createIteratorLoop:
 		for {
-			// TODO: do we want to limit amount of time we wait?
-			if err := p.createProxy(ctx, &s); err != nil { //nolint:scopelint
-				wait := b.NextBackOff()
-				p.log.Warnf("failed to create port-forward for '%s/%s': %v (retry in %s)", s.Namespace, s.Name, err, wait.String())
-
-				time.Sleep(wait)
-				continue
+			select {
+			case <-ticker.C:
+				if err := p.createProxy(ctx, &s); err != nil { //nolint:scopelint
+					p.log.Warnf("failed to create port-forward for '%s/%s': %v (trying again)", s.Namespace, s.Name, err)
+				}
+				ticker.Stop()
+				break createIteratorLoop
+			case <-ctx.Done():
+				break createLoop
 			}
-
-			// if we didn't error, then we exit the loop
-			break
 		}
 	}
 

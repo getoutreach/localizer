@@ -16,7 +16,6 @@ package proxier
 import (
 	"context"
 	"strconv"
-	"strings"
 
 	"github.com/jaredallard/localizer/internal/kube"
 	"github.com/pkg/errors"
@@ -29,8 +28,6 @@ import (
 )
 
 const (
-	RemapAnnotationPrefix = "localizer.jaredallard.github.com/remap-"
-
 	// This is used to support exposed services being "forwarded"
 	ExposedAnnotation = "localizer.jaredallard.github.com/exposed"
 
@@ -101,27 +98,6 @@ func (d *Discoverer) Discover(ctx context.Context) ([]Service, error) { //nolint
 				continue
 			}
 
-			remaps := make(map[string]uint)
-			for k, v := range kserv.Annotations {
-				if !strings.HasPrefix(k, RemapAnnotationPrefix) {
-					continue
-				}
-
-				// for now, skip invalid ports. We may want to expose
-				// this someday in the future
-				portOverride, err := strconv.ParseUint(v, 0, 64)
-				if err != nil {
-					continue
-				}
-
-				// TODO(jaredallard): determine if ToLower is really needed here.
-				// for ease of use we transform this remap to lowercase here
-				// when processing ports we also convert their name to lowercase
-				// just in case. Though the spec may enforce this to begin with.
-				portName := strings.ToLower(strings.TrimPrefix(k, RemapAnnotationPrefix))
-				remaps[portName] = uint(portOverride)
-			}
-
 			// convert the Kubernetes ports into our own internal data model
 			// we also handle overriding localPorts via the RemapAnnotation here.
 			servicePorts, exists, err := kube.ResolveServicePorts(ctx, d.k, &kserv) //nolint:scopelint
@@ -152,15 +128,10 @@ func (d *Discoverer) Discover(ctx context.Context) ([]Service, error) { //nolint
 
 				remotePort := p.TargetPort.IntValue()
 
-				// if remote port is 0, or it was originally a string,
+				// if remote port is 0, or it was originally a string, (and unresolvable)
 				// or undefined, er assume the localPort is the same
 				if remotePort == 0 {
 					remotePort = int(localPort)
-				}
-
-				override := remaps[strings.ToLower(p.Name)]
-				if override != 0 {
-					localPort = override
 				}
 
 				serv.Ports = append(serv.Ports, &ServicePort{

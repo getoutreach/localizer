@@ -65,7 +65,7 @@ func (pc *ProxyConnection) Start(ctx context.Context) error {
 			pc.fw = nil
 
 			pc.proxier.log.WithField("port", pc.GetPort()).Debug("port-forward died")
-			pc.proxier.handleInformerEvent("connection-dead", pc)
+			pc.proxier.handleInformerEvent(ctx, "connection-dead", pc)
 		}
 	}()
 
