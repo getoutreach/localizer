@@ -15,6 +15,7 @@ package proxier
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 
 	"github.com/jaredallard/localizer/internal/kube"
@@ -87,6 +88,12 @@ func (d *Discoverer) Discover(ctx context.Context) ([]Service, error) { //nolint
 				continue
 			}
 
+			k, _ := cache.MetaNamespaceKeyFunc(kserv)
+			if k == "" {
+				// Note: this likely does nothing, just checking
+				k = fmt.Sprintf("%s/%s", kserv.Name, kserv.Namespace)
+			}
+
 			serv := Service{
 				Name:      kserv.Name,
 				Namespace: kserv.Namespace,
@@ -102,11 +109,9 @@ func (d *Discoverer) Discover(ctx context.Context) ([]Service, error) { //nolint
 			// we also handle overriding localPorts via the RemapAnnotation here.
 			servicePorts, exists, err := kube.ResolveServicePorts(ctx, d.k, &kserv) //nolint:scopelint
 			if err != nil {
-				k, _ := cache.MetaNamespaceKeyFunc(kserv)
 				d.log.Debug("failed to process servicePorts for service %s: %v", k, err)
 				continue
 			} else if !exists {
-				k, _ := cache.MetaNamespaceKeyFunc(kserv)
 				d.log.Warnf("service '%s' has no endpoints, will not forward", k)
 				continue
 			}

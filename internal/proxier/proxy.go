@@ -368,11 +368,6 @@ func (p *Proxier) createProxy(ctx context.Context, s *Service) error { //nolint:
 	}
 
 	for _, port := range s.Ports {
-		if port.LocalPort <= 1024 {
-			p.log.Warnf("skipping service '%s' port %d, privledged ports are not allowed", serviceKey, port.LocalPort)
-			continue
-		}
-
 		p.log.Infof("creating port-forward '%s:%d'", serviceKey, port.RemotePort)
 
 		// build the linking tables
