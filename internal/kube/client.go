@@ -122,8 +122,10 @@ func ResolveServicePorts(ctx context.Context, k kubernetes.Interface,
 
 			// iterate over the ports to find what
 			// the named port references
+			// note that the name of the port will be the
+			// service's port name, not the targetPort
 			for _, np := range e.Subsets[0].Ports {
-				if np.Name == p.TargetPort.String() {
+				if np.Name == p.Name || np.Name == p.TargetPort.String() {
 					original = p.TargetPort.String()
 					p.TargetPort = intstr.FromInt(int(np.Port))
 					break
