@@ -16,6 +16,7 @@ package proxier
 import (
 	"context"
 	"fmt"
+	"os/exec"
 	"reflect"
 	"sort"
 	"sync"
@@ -61,6 +62,7 @@ type Proxier struct {
 	// ProxyConnections
 	connMutex      sync.Mutex
 	active         map[uint]*ProxyConnection
+	serviceIPs     map[string]*ipam.IP
 	activeServices map[string][]*ProxyConnection
 	activePods     map[string][]*ProxyConnection
 }
@@ -95,6 +97,7 @@ func NewProxier(k kubernetes.Interface, kconf *rest.Config, l logrus.FieldLogger
 		ipamPrefix: prefix,
 
 		active:         make(map[uint]*ProxyConnection),
+		serviceIPs:     make(map[string]*ipam.IP),
 		activePods:     make(map[string][]*ProxyConnection),
 		activeServices: make(map[string][]*ProxyConnection),
 	}
@@ -308,10 +311,6 @@ func (p *Proxier) createProxy(ctx context.Context, s *Service) error { //nolint:
 
 	serviceKey, _ := cache.MetaNamespaceKeyFunc(kserv)
 	podKey, _ := cache.MetaNamespaceKeyFunc(pod)
-	ipAddress, err := p.ipam.AcquireIP(p.ipamPrefix.Cidr)
-	if err != nil {
-		return errors.Wrap(err, "failed to allocate IP address")
-	}
 
 	if pod.Annotations[ExposedAnnotation] == "true" {
 		// TODO(jaredallard): this should only be done
@@ -322,7 +321,7 @@ func (p *Proxier) createProxy(ctx context.Context, s *Service) error { //nolint:
 			p.active[port.LocalPort] = &ProxyConnection{
 				p,
 				nil,
-				ipAddress,
+				nil,
 				port.LocalPort,
 				port.RemotePort,
 				*s,
@@ -355,6 +354,21 @@ func (p *Proxier) createProxy(ctx context.Context, s *Service) error { //nolint:
 		return fmt.Errorf("selected pod wasn't running, got status: %v", pod.Status.Phase)
 	}
 
+	ipAddress := p.serviceIPs[serviceKey]
+	if ipAddress == nil {
+		ipAddress, err = p.ipam.AcquireIP(p.ipamPrefix.Cidr)
+		if err != nil {
+			return errors.Wrap(err, "failed to allocate IP address")
+		}
+
+		args := []string{"lo0", "alias", ipAddress.IP.String(), "up"}
+		if err := exec.Command("ifconfig", args...).Run(); err != nil {
+			return errors.Wrap(err, "failed to create ip link")
+		}
+
+		p.serviceIPs[serviceKey] = ipAddress
+	}
+
 	for _, port := range s.Ports {
 		if port.LocalPort <= 1024 {
 			p.log.Warnf("skipping service '%s' port %d, privledged ports are not allowed", serviceKey, port.LocalPort)
@@ -377,7 +391,7 @@ func (p *Proxier) createProxy(ctx context.Context, s *Service) error { //nolint:
 			continue
 		}
 
-		p.log.Infof("creating port-forward '%s:%d' -> '%s:%d'", serviceKey, port.RemotePort, ipAddress.IP.String(), port.LocalPort)
+		p.log.Infof("creating port-forward '%s:%d'", serviceKey, port.RemotePort)
 
 		// build the linking tables
 		// port -> conn
@@ -418,12 +432,10 @@ func (p *Proxier) createProxy(ctx context.Context, s *Service) error { //nolint:
 	}
 
 	// only add addresses for services we actually are routing to
-	if len(p.activeServices[serviceKey]) > 0 {
-		p.log.Debugf("adding hosts file entry for service '%s'", serviceKey)
-		p.hosts.AddHosts(ipAddress.IP.String(), serviceAddresses(kserv))
-		if err := p.hosts.Save(); err != nil {
-			return errors.Wrap(err, "failed to save address to hosts")
-		}
+	p.log.Debugf("adding hosts file entry for service '%s'", serviceKey)
+	p.hosts.AddHosts(ipAddress.IP.String(), serviceAddresses(kserv))
+	if err := p.hosts.Save(); err != nil {
+		return errors.Wrap(err, "failed to save address to hosts")
 	}
 
 	return nil
@@ -466,6 +478,13 @@ func (p *Proxier) Proxy(ctx context.Context) error {
 		p.hosts.RemoveHosts(addrs)
 		if err := p.hosts.Save(); err != nil {
 			p.log.Warnf("failed to clean hosts file: %v", err)
+		}
+	}
+
+	for _, ip := range p.serviceIPs {
+		args := []string{"lo0", "-alias", ip.IP.String(), "up"}
+		if err := exec.Command("ifconfig", args...).Run(); err != nil {
+			return errors.Wrapf(err, "failed to remove ip alias '%s'", ip.IP.String())
 		}
 	}
 
