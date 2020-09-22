@@ -18,6 +18,7 @@ import (
 	"fmt"
 
 	"github.com/jaredallard/localizer/internal/kube"
+	"github.com/metal-stack/go-ipam"
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/tools/portforward"
@@ -28,6 +29,7 @@ type ProxyConnection struct {
 	proxier *Proxier
 	fw      *portforward.PortForwarder
 
+	IP         *ipam.IP
 	LocalPort  uint
 	RemotePort uint
 
@@ -79,6 +81,13 @@ func (pc *ProxyConnection) Close() error {
 	// this has already been closed
 	if pc.fw != nil {
 		pc.fw.Close()
+	}
+
+	if pc.IP != nil {
+		_, err := pc.proxier.ipam.ReleaseIP(pc.IP)
+		if err != nil {
+			return errors.Wrap(err, "failed to free IP address")
+		}
 	}
 
 	// we'll return an error one day

@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/cenkalti/backoff/v4"
+	"github.com/metal-stack/go-ipam"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/txn2/txeh"
@@ -50,6 +51,9 @@ type Proxier struct {
 	kconf *rest.Config
 	log   logrus.FieldLogger
 
+	// ip address store
+	ipam ipam.Ipamer
+
 	s []Service
 
 	// active{,services,Pods} are mapping indexes for
@@ -67,6 +71,9 @@ func NewProxier(k kubernetes.Interface, kconf *rest.Config, l logrus.FieldLogger
 		l.Fatalf("failed to open hosts file: %v", err)
 	}
 
+	ipamInstance := ipam.New()
+	ipamInstance.AcquireSpecificIP("127.0.0.1/8", "127.0.0.1")
+
 	return &Proxier{
 		k:     k,
 		hosts: hosts,
@@ -74,6 +81,7 @@ func NewProxier(k kubernetes.Interface, kconf *rest.Config, l logrus.FieldLogger
 		rest:  k.CoreV1().RESTClient(),
 		log:   l,
 		s:     make([]Service, 0),
+		ipam:  ipam.New(),
 
 		active:         make(map[uint]*ProxyConnection),
 		activePods:     make(map[string][]*ProxyConnection),
@@ -289,6 +297,10 @@ func (p *Proxier) createProxy(ctx context.Context, s *Service) error { //nolint:
 
 	serviceKey, _ := cache.MetaNamespaceKeyFunc(kserv)
 	podKey, _ := cache.MetaNamespaceKeyFunc(pod)
+	ipAddress, err := p.ipam.AcquireIP("127.0.0.1/9")
+	if err != nil {
+		return errors.Wrap(err, "failed to allocate IP address")
+	}
 
 	if pod.Annotations[ExposedAnnotation] == "true" {
 		// TODO(jaredallard): this should only be done
@@ -299,7 +311,7 @@ func (p *Proxier) createProxy(ctx context.Context, s *Service) error { //nolint:
 			p.active[port.LocalPort] = &ProxyConnection{
 				p,
 				nil,
-
+				ipAddress,
 				port.LocalPort,
 				port.RemotePort,
 				*s,
@@ -354,7 +366,7 @@ func (p *Proxier) createProxy(ctx context.Context, s *Service) error { //nolint:
 			continue
 		}
 
-		p.log.Infof("creating port-forward '%s:%d' -> '127.0.0.1:%d'", serviceKey, port.RemotePort, port.LocalPort)
+		p.log.Infof("creating port-forward '%s:%d' -> '%s:%d'", serviceKey, port.RemotePort, ipAddress.IP.String(), port.LocalPort)
 
 		// build the linking tables
 		// port -> conn
@@ -363,6 +375,7 @@ func (p *Proxier) createProxy(ctx context.Context, s *Service) error { //nolint:
 			p,
 			nil,
 
+			ipAddress,
 			port.LocalPort,
 			port.RemotePort,
 			*s,
@@ -396,7 +409,7 @@ func (p *Proxier) createProxy(ctx context.Context, s *Service) error { //nolint:
 	// only add addresses for services we actually are routing to
 	if len(p.activeServices[serviceKey]) > 0 {
 		p.log.Debugf("adding hosts file entry for service '%s'", serviceKey)
-		p.hosts.AddHosts("127.0.0.1", serviceAddresses(kserv))
+		p.hosts.AddHosts(ipAddress.IP.String(), serviceAddresses(kserv))
 		if err := p.hosts.Save(); err != nil {
 			return errors.Wrap(err, "failed to save address to hosts")
 		}
@@ -427,16 +440,11 @@ func (p *Proxier) Proxy(ctx context.Context) error {
 	<-ctx.Done()
 	p.log.Info("cleaning up ...")
 
-	for k, s := range p.activeServices {
+	for k := range p.activeServices {
 		namespace, name, err := cache.SplitMetaNamespaceKey(k)
 		if err != nil {
 			// TODO: handle this
 			continue
-		}
-
-		// close the port-forwards
-		for _, pc := range s {
-			pc.Close()
 		}
 
 		// cleanup the DNS entries
