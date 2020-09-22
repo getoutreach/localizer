@@ -52,7 +52,8 @@ type Proxier struct {
 	log   logrus.FieldLogger
 
 	// ip address store
-	ipam ipam.Ipamer
+	ipam       ipam.Ipamer
+	ipamPrefix *ipam.Prefix
 
 	s []Service
 
@@ -72,16 +73,26 @@ func NewProxier(k kubernetes.Interface, kconf *rest.Config, l logrus.FieldLogger
 	}
 
 	ipamInstance := ipam.New()
-	ipamInstance.AcquireSpecificIP("127.0.0.1/8", "127.0.0.1")
+	prefix, err := ipamInstance.NewPrefix("127.0.0.1/8")
+	if err != nil {
+		panic(err)
+	}
+
+	// ensure that 127.0.0.1 is never allocated
+	_, err = ipamInstance.AcquireSpecificIP(prefix.Cidr, "127.0.0.1")
+	if err != nil {
+		panic(err)
+	}
 
 	return &Proxier{
-		k:     k,
-		hosts: hosts,
-		kconf: kconf,
-		rest:  k.CoreV1().RESTClient(),
-		log:   l,
-		s:     make([]Service, 0),
-		ipam:  ipam.New(),
+		k:          k,
+		hosts:      hosts,
+		kconf:      kconf,
+		rest:       k.CoreV1().RESTClient(),
+		log:        l,
+		s:          make([]Service, 0),
+		ipam:       ipamInstance,
+		ipamPrefix: prefix,
 
 		active:         make(map[uint]*ProxyConnection),
 		activePods:     make(map[string][]*ProxyConnection),
@@ -297,7 +308,7 @@ func (p *Proxier) createProxy(ctx context.Context, s *Service) error { //nolint:
 
 	serviceKey, _ := cache.MetaNamespaceKeyFunc(kserv)
 	podKey, _ := cache.MetaNamespaceKeyFunc(pod)
-	ipAddress, err := p.ipam.AcquireIP("127.0.0.1/9")
+	ipAddress, err := p.ipam.AcquireIP(p.ipamPrefix.Cidr)
 	if err != nil {
 		return errors.Wrap(err, "failed to allocate IP address")
 	}
