@@ -67,9 +67,6 @@ func (p *ServiceForward) createServerPodAndTransport(ctx context.Context) (func(
 	for i, port := range p.Ports {
 		portInt := int(port.TargetPort.IntVal)
 		name := port.OriginalTargetPort
-		if name == "" {
-			name = port.Name
-		}
 		cp := corev1.ContainerPort{
 			ContainerPort: int32(portInt),
 			Name:          name,
