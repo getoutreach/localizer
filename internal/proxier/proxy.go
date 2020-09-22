@@ -16,12 +16,14 @@ package proxier
 import (
 	"context"
 	"fmt"
+	"os/exec"
 	"reflect"
 	"sort"
 	"sync"
 	"time"
 
 	"github.com/cenkalti/backoff/v4"
+	"github.com/metal-stack/go-ipam"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/txn2/txeh"
@@ -50,12 +52,16 @@ type Proxier struct {
 	kconf *rest.Config
 	log   logrus.FieldLogger
 
+	// ip address store
+	ipam       ipam.Ipamer
+	ipamPrefix *ipam.Prefix
+
 	s []Service
 
 	// active{,services,Pods} are mapping indexes for
 	// ProxyConnections
 	connMutex      sync.Mutex
-	active         map[uint]*ProxyConnection
+	serviceIPs     map[string]*ipam.IP
 	activeServices map[string][]*ProxyConnection
 	activePods     map[string][]*ProxyConnection
 }
@@ -67,15 +73,29 @@ func NewProxier(k kubernetes.Interface, kconf *rest.Config, l logrus.FieldLogger
 		l.Fatalf("failed to open hosts file: %v", err)
 	}
 
-	return &Proxier{
-		k:     k,
-		hosts: hosts,
-		kconf: kconf,
-		rest:  k.CoreV1().RESTClient(),
-		log:   l,
-		s:     make([]Service, 0),
+	ipamInstance := ipam.New()
+	prefix, err := ipamInstance.NewPrefix("127.0.0.1/8")
+	if err != nil {
+		panic(err)
+	}
 
-		active:         make(map[uint]*ProxyConnection),
+	// ensure that 127.0.0.1 is never allocated
+	_, err = ipamInstance.AcquireSpecificIP(prefix.Cidr, "127.0.0.1")
+	if err != nil {
+		panic(err)
+	}
+
+	return &Proxier{
+		k:          k,
+		hosts:      hosts,
+		kconf:      kconf,
+		rest:       k.CoreV1().RESTClient(),
+		log:        l,
+		s:          make([]Service, 0),
+		ipam:       ipamInstance,
+		ipamPrefix: prefix,
+
+		serviceIPs:     make(map[string]*ipam.IP),
 		activePods:     make(map[string][]*ProxyConnection),
 		activeServices: make(map[string][]*ProxyConnection),
 	}
@@ -93,7 +113,7 @@ func serviceAddresses(s *corev1.Service) []string {
 	}
 }
 
-func (p *Proxier) handleInformerEvent(event string, obj interface{}) { //nolint:funlen,gocyclo
+func (p *Proxier) handleInformerEvent(ctx context.Context, event string, obj interface{}) { //nolint:funlen,gocyclo
 	item := ""
 	switch obj.(type) {
 	case *corev1.Pod:
@@ -146,7 +166,6 @@ func (p *Proxier) handleInformerEvent(event string, obj interface{}) { //nolint:
 			refreshServices[i] = pc.Service
 			refreshPorts[i] = pc.GetPort()
 			pc.Close()
-			p.active[pc.LocalPort] = nil
 		}
 
 		// reset the activePods
@@ -159,23 +178,21 @@ func (p *Proxier) handleInformerEvent(event string, obj interface{}) { //nolint:
 		}
 
 		for _, s := range refreshServices {
-			b := backoff.NewExponentialBackOff()
+			ticker := backoff.NewTicker(backoff.NewExponentialBackOff())
 			for {
-				// TODO: do we want to limit amount of time we wait?
-				if err := p.createProxy(context.TODO(), &s); err != nil { //nolint:scopelint
-					wait := b.NextBackOff()
-					p.log.Warnf("failed to refresh port-forward for %s: %v (trying again in %s)", k, err, wait.String())
-
-					time.Sleep(wait)
-					continue
+				select {
+				case <-ticker.C:
+					if err := p.createProxy(ctx, &s); err != nil { //nolint:scopelint
+						p.log.Warnf("failed to refresh port-forward for %s: %v (trying again)", k, err)
+					}
+					ticker.Stop()
+					p.log.WithField("ports", refreshPorts).
+						Infof("refreshed port-forward(s) for '%s'", k)
+					return
+				case <-ctx.Done():
+					return
 				}
-
-				// if we didn't error, then we exit the loop
-				break
 			}
-
-			p.log.WithField("ports", refreshPorts).
-				Infof("refreshed port-forward(s) for '%s'", k)
 		}
 
 	case "service":
@@ -185,7 +202,6 @@ func (p *Proxier) handleInformerEvent(event string, obj interface{}) { //nolint:
 		for i, pc := range p.activeServices[k] {
 			removedPorts[i] = pc.GetPort()
 			pc.Close()
-			p.active[pc.LocalPort] = nil
 		}
 
 		// reset the activeServices section for this service
@@ -212,10 +228,10 @@ func (p *Proxier) Start(ctx context.Context) error {
 		time.Second*0,
 		cache.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
-				p.handleInformerEvent("add", obj)
+				p.handleInformerEvent(ctx, "add", obj)
 			},
 			DeleteFunc: func(obj interface{}) {
-				p.handleInformerEvent("delete", obj)
+				p.handleInformerEvent(ctx, "delete", obj)
 			},
 		},
 	)
@@ -226,10 +242,10 @@ func (p *Proxier) Start(ctx context.Context) error {
 		time.Second*0,
 		cache.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
-				p.handleInformerEvent("add", obj)
+				p.handleInformerEvent(ctx, "add", obj)
 			},
 			DeleteFunc: func(obj interface{}) {
-				p.handleInformerEvent("delete", obj)
+				p.handleInformerEvent(ctx, "delete", obj)
 			},
 		},
 	)
@@ -296,10 +312,10 @@ func (p *Proxier) createProxy(ctx context.Context, s *Service) error { //nolint:
 		p.log.Debug("found exposed pod, faking port-forward")
 
 		for _, port := range s.Ports {
-			p.active[port.LocalPort] = &ProxyConnection{
+			conn := &ProxyConnection{
 				p,
 				nil,
-
+				nil,
 				port.LocalPort,
 				port.RemotePort,
 				*s,
@@ -307,7 +323,7 @@ func (p *Proxier) createProxy(ctx context.Context, s *Service) error { //nolint:
 				true,
 			}
 
-			conn := p.active[port.LocalPort]
+			p.connMutex.Lock()
 			if p.activeServices[serviceKey] == nil {
 				p.activeServices[serviceKey] = make([]*ProxyConnection, 0)
 			}
@@ -318,6 +334,7 @@ func (p *Proxier) createProxy(ctx context.Context, s *Service) error { //nolint:
 				p.activePods[podKey] = make([]*ProxyConnection, 0)
 			}
 			p.activePods[podKey] = append(p.activePods[podKey], conn)
+			p.connMutex.Unlock()
 		}
 
 		p.hosts.AddHosts("127.0.0.1", serviceAddresses(kserv))
@@ -332,44 +349,43 @@ func (p *Proxier) createProxy(ctx context.Context, s *Service) error { //nolint:
 		return fmt.Errorf("selected pod wasn't running, got status: %v", pod.Status.Phase)
 	}
 
+	ipAddress := p.serviceIPs[serviceKey]
+	if ipAddress == nil {
+		ipAddress, err = p.ipam.AcquireIP(p.ipamPrefix.Cidr)
+		if err != nil {
+			return errors.Wrap(err, "failed to allocate IP address")
+		}
+
+		args := []string{"lo0", "alias", ipAddress.IP.String(), "up"}
+		if err := exec.Command("ifconfig", args...).Run(); err != nil {
+			return errors.Wrap(err, "failed to create ip link")
+		}
+
+		p.serviceIPs[serviceKey] = ipAddress
+	}
+
 	for _, port := range s.Ports {
 		if port.LocalPort <= 1024 {
 			p.log.Warnf("skipping service '%s' port %d, privledged ports are not allowed", serviceKey, port.LocalPort)
 			continue
 		}
 
-		// ap stores the connections
-		ap := p.active[port.LocalPort]
-		if ap != nil && ap.Active {
-			// Check if a different service than us is using that port already
-			// if it is, drop a log
-			if ap.Service.Name != s.Name && ap.Service.Namespace != s.Namespace {
-				p.log.Warnf(
-					"skipping port-forward for '%s:%d', '%s/%s' is using that port already",
-					serviceKey, port.LocalPort, ap.Service.Namespace, ap.Service.Name,
-				)
-			}
-
-			// skip ports that are already in use
-			continue
-		}
-
-		p.log.Infof("creating port-forward '%s:%d' -> '127.0.0.1:%d'", serviceKey, port.RemotePort, port.LocalPort)
+		p.log.Infof("creating port-forward '%s:%d'", serviceKey, port.RemotePort)
 
 		// build the linking tables
 		// port -> conn
 		p.connMutex.Lock()
-		p.active[port.LocalPort] = &ProxyConnection{
+		conn := &ProxyConnection{
 			p,
 			nil,
 
+			ipAddress,
 			port.LocalPort,
 			port.RemotePort,
 			*s,
 			*pod,
 			false,
 		}
-		conn := p.active[port.LocalPort]
 
 		// service -> []Conn
 		if p.activeServices[serviceKey] == nil {
@@ -387,19 +403,17 @@ func (p *Proxier) createProxy(ctx context.Context, s *Service) error { //nolint:
 		// start the proxy
 		if err := conn.Start(ctx); err != nil {
 			p.log.Errorf(
-				"failed to start proxy for '%s:%d' -> ':%d': %v",
+				"failed to start proxy for '%s:%d'",
 				serviceKey, port.RemotePort, port.LocalPort, err,
 			)
 		}
 	}
 
 	// only add addresses for services we actually are routing to
-	if len(p.activeServices[serviceKey]) > 0 {
-		p.log.Debugf("adding hosts file entry for service '%s'", serviceKey)
-		p.hosts.AddHosts("127.0.0.1", serviceAddresses(kserv))
-		if err := p.hosts.Save(); err != nil {
-			return errors.Wrap(err, "failed to save address to hosts")
-		}
+	p.log.Debugf("adding hosts file entry for service '%s'", serviceKey)
+	p.hosts.AddHosts(ipAddress.IP.String(), serviceAddresses(kserv))
+	if err := p.hosts.Save(); err != nil {
+		return errors.Wrap(err, "failed to save address to hosts")
 	}
 
 	return nil
@@ -407,36 +421,32 @@ func (p *Proxier) createProxy(ctx context.Context, s *Service) error { //nolint:
 
 // Proxy starts a proxier.
 func (p *Proxier) Proxy(ctx context.Context) error {
+createLoop:
 	for _, s := range p.s {
-		b := backoff.NewExponentialBackOff()
+		ticker := backoff.NewTicker(backoff.NewExponentialBackOff())
+	createIteratorLoop:
 		for {
-			// TODO: do we want to limit amount of time we wait?
-			if err := p.createProxy(ctx, &s); err != nil { //nolint:scopelint
-				wait := b.NextBackOff()
-				p.log.Warnf("failed to create port-forward for '%s/%s': %v (retry in %s)", s.Namespace, s.Name, err, wait.String())
-
-				time.Sleep(wait)
-				continue
+			select {
+			case <-ticker.C:
+				if err := p.createProxy(ctx, &s); err != nil { //nolint:scopelint
+					p.log.Warnf("failed to create port-forward for '%s/%s': %v (trying again)", s.Namespace, s.Name, err)
+				}
+				ticker.Stop()
+				break createIteratorLoop
+			case <-ctx.Done():
+				break createLoop
 			}
-
-			// if we didn't error, then we exit the loop
-			break
 		}
 	}
 
 	<-ctx.Done()
 	p.log.Info("cleaning up ...")
 
-	for k, s := range p.activeServices {
+	for k := range p.activeServices {
 		namespace, name, err := cache.SplitMetaNamespaceKey(k)
 		if err != nil {
 			// TODO: handle this
 			continue
-		}
-
-		// close the port-forwards
-		for _, pc := range s {
-			pc.Close()
 		}
 
 		// cleanup the DNS entries
@@ -447,6 +457,13 @@ func (p *Proxier) Proxy(ctx context.Context) error {
 		p.hosts.RemoveHosts(addrs)
 		if err := p.hosts.Save(); err != nil {
 			p.log.Warnf("failed to clean hosts file: %v", err)
+		}
+	}
+
+	for _, ip := range p.serviceIPs {
+		args := []string{"lo0", "-alias", ip.IP.String(), "up"}
+		if err := exec.Command("ifconfig", args...).Run(); err != nil {
+			return errors.Wrapf(err, "failed to remove ip alias '%s'", ip.IP.String())
 		}
 	}
 

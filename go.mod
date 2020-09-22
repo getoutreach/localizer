@@ -5,6 +5,7 @@ go 1.15
 require (
 	github.com/cenkalti/backoff/v4 v4.0.2
 	github.com/davecgh/go-spew v1.1.1
+	github.com/metal-stack/go-ipam v1.6.0
 	github.com/omrikiei/ktunnel v1.2.8-beta.0.20200903140414-c553ba6656ef
 	github.com/pkg/errors v0.9.1
 	github.com/sirupsen/logrus v1.6.0
