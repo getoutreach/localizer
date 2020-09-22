@@ -114,6 +114,8 @@ func serviceAddresses(s *corev1.Service) []string {
 }
 
 func (p *Proxier) handleInformerEvent(ctx context.Context, event string, obj interface{}) { //nolint:funlen,gocyclo
+	k, _ := cache.MetaNamespaceKeyFunc(obj)
+
 	item := ""
 	switch obj.(type) {
 	case *corev1.Pod:
@@ -127,6 +129,7 @@ func (p *Proxier) handleInformerEvent(ctx context.Context, event string, obj int
 		p.log.WithFields(logrus.Fields{
 			"event": event,
 			"type":  reflect.TypeOf(obj).String(),
+			"key":   k,
 		}).Debug("ignored event")
 		return
 	}
@@ -137,11 +140,11 @@ func (p *Proxier) handleInformerEvent(ctx context.Context, event string, obj int
 		p.log.WithFields(logrus.Fields{
 			"event": event,
 			"type":  reflect.TypeOf(obj).String(),
+			"key":   k,
 		}).Debug("skipped event")
 		return
 	}
 
-	k, _ := cache.MetaNamespaceKeyFunc(obj)
 	p.log.WithFields(logrus.Fields{
 		"item":  item,
 		"event": event,
