@@ -17,10 +17,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"strconv"
 	"strings"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/jaredallard/localizer/internal/kube"
 	"github.com/jaredallard/localizer/internal/proxier"
 	"github.com/omrikiei/ktunnel/pkg/client"
@@ -69,10 +69,6 @@ func (p *ServiceForward) createServerPodAndTransport(ctx context.Context) (func(
 		name := port.OriginalTargetPort
 		if name == "" {
 			name = port.Name
-			if name == "" {
-				// fallback to a simple port based name
-				name = strconv.Itoa(portInt)
-			}
 		}
 		cp := corev1.ContainerPort{
 			ContainerPort: int32(portInt),
@@ -89,7 +85,7 @@ func (p *ServiceForward) createServerPodAndTransport(ctx context.Context) (func(
 		return func() {}, err
 	}
 
-	po, err := p.c.k.CoreV1().Pods(p.Namespace).Create(ctx, &corev1.Pod{
+	podObject := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace:    p.Namespace,
 			GenerateName: "localizer-",
@@ -127,7 +123,10 @@ func (p *ServiceForward) createServerPodAndTransport(ctx context.Context) (func(
 				},
 			},
 		},
-	}, metav1.CreateOptions{})
+	}
+	p.c.log.Debug(spew.Sdump(podObject))
+
+	po, err := p.c.k.CoreV1().Pods(p.Namespace).Create(ctx, podObject, metav1.CreateOptions{})
 	if err != nil {
 		return func() {}, errors.Wrap(err, "failed to create pod")
 	}

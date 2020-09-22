@@ -20,6 +20,7 @@ import (
 
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
+	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/kubernetes"
@@ -95,10 +96,26 @@ type ResolvedServicePort struct {
 // ResolveServicePorts converts named ports into their true
 // format. TargetPort's that have are named become their integer equivalents
 func ResolveServicePorts(ctx context.Context, k kubernetes.Interface,
-	s *corev1.Service) ([]ResolvedServicePort, error) {
+	s *corev1.Service) ([]ResolvedServicePort, bool, error) {
 	e, err := k.CoreV1().Endpoints(s.ObjectMeta.Namespace).Get(ctx, s.ObjectMeta.Name, metav1.GetOptions{})
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to get endpoints")
+	if kerrors.IsNotFound(err) || len(e.Subsets) == 0 {
+		// if there are no endpoints, don't resolve, just return them
+		servicePorts := make([]ResolvedServicePort, len(s.Spec.Ports))
+		for i, sp := range s.Spec.Ports {
+			// convert the named port into the original port, since we can't exactly resolve
+			// it :(
+			if sp.TargetPort.Type == intstr.String {
+				sp.TargetPort = intstr.FromInt(int(sp.Port))
+			}
+
+			servicePorts[i] = ResolvedServicePort{
+				sp,
+				"",
+			}
+		}
+		return servicePorts, false, nil
+	} else if err != nil {
+		return nil, false, errors.Wrap(err, "failed to get endpoints")
 	}
 
 	servicePorts := make([]ResolvedServicePort, len(s.Spec.Ports))
@@ -126,5 +143,5 @@ func ResolveServicePorts(ctx context.Context, k kubernetes.Interface,
 		}
 	}
 
-	return servicePorts, nil
+	return servicePorts, true, nil
 }

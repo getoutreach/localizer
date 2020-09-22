@@ -124,10 +124,14 @@ func (d *Discoverer) Discover(ctx context.Context) ([]Service, error) { //nolint
 
 			// convert the Kubernetes ports into our own internal data model
 			// we also handle overriding localPorts via the RemapAnnotation here.
-			servicePorts, err := kube.ResolveServicePorts(ctx, d.k, &kserv) //nolint:scopelint
+			servicePorts, exists, err := kube.ResolveServicePorts(ctx, d.k, &kserv) //nolint:scopelint
 			if err != nil {
 				k, _ := cache.MetaNamespaceKeyFunc(kserv)
 				d.log.Debug("failed to process servicePorts for service %s: %v", k, err)
+				continue
+			} else if !exists {
+				k, _ := cache.MetaNamespaceKeyFunc(kserv)
+				d.log.Warnf("service '%s' has no endpoints, will not forward", k)
 				continue
 			}
 
@@ -147,6 +151,12 @@ func (d *Discoverer) Discover(ctx context.Context) ([]Service, error) { //nolint
 				}
 
 				remotePort := p.TargetPort.IntValue()
+
+				// if remote port is 0, or it was originally a string,
+				// or undefined, er assume the localPort is the same
+				if remotePort == 0 {
+					remotePort = int(localPort)
+				}
 
 				override := remaps[strings.ToLower(p.Name)]
 				if override != 0 {

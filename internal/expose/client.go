@@ -179,30 +179,20 @@ func (c *Client) getOwnerRefKey(ref *corev1.ObjectReference) string {
 	return fmt.Sprintf("%s/%s", ref.Namespace, ref.Name)
 }
 
-// Expose exposed a port, localPort, on the local host, and opens a remote port
-// that can be accessed via the remote service at remotePort
-func (c *Client) Expose(ctx context.Context, ports []kube.ResolvedServicePort, namespace, serviceName string) (*ServiceForward, error) { //nolint:funlen,gocyclo,lll
-	s, err := c.k.CoreV1().Services(namespace).Get(ctx, serviceName, metav1.GetOptions{})
-	if err != nil {
-		return nil, err
-	}
-
-	if len(s.Spec.Selector) == 0 {
-		return nil, fmt.Errorf("headless services are not supported")
-	}
-
+// getServiceControllers looks for deployments, statefulsets, and other things
+// that created pods attached to a service tracks them along with their current
+// scale.
+func (c *Client) getServiceControllers(ctx context.Context, namespace, serviceName string) (map[string]scaledObjectType, error) { //nolint:funlen,gocyclo,lll
 	e, err := c.k.CoreV1().Endpoints(namespace).Get(ctx, serviceName, metav1.GetOptions{})
 	if err != nil {
 		return nil, err
 	}
-
-	objects := make(map[string]scaledObjectType)
-
 	if len(e.Subsets) == 0 {
 		// TODO(jaredallard): If no endpoints, then we can just drop it
 		return nil, fmt.Errorf("failed to find any endpoints for this service")
 	}
 
+	objects := make(map[string]scaledObjectType)
 	c.log.Debugf("found %d subsets", len(e.Subsets))
 	for _, s := range e.Subsets {
 		c.log.Debugf("found %d addresses", len(s.Addresses))
@@ -298,6 +288,30 @@ func (c *Client) Expose(ctx context.Context, ports []kube.ResolvedServicePort, n
 
 			objects[o.GetKey()] = o
 		}
+	}
+
+	return objects, nil
+}
+
+// Expose exposed a port, localPort, on the local host, and opens a remote port
+// that can be accessed via the remote service at remotePort
+func (c *Client) Expose(ctx context.Context, ports []kube.ResolvedServicePort, namespace, serviceName string) (*ServiceForward, error) {
+	s, err := c.k.CoreV1().Services(namespace).Get(ctx, serviceName, metav1.GetOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	if len(s.Spec.Selector) == 0 {
+		return nil, fmt.Errorf("headless services are not supported")
+	}
+
+	objects, err := c.getServiceControllers(ctx, namespace, serviceName)
+	if err != nil {
+		// if we failed to find any controllers, we need to assume that
+		// a service have no replicas, and thus won't handle any scale up
+		// scale down operations
+		c.log.WithError(err).Debug("failed to get controllers")
+		objects = make(map[string]scaledObjectType)
 	}
 
 	return &ServiceForward{

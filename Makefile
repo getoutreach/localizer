@@ -5,7 +5,7 @@ GOOS           := $(shell go env GOOS)
 GOARCH         := $(shell go env GOARCH)
 PKG            := $(GO) mod download
 # TODO(jaredallard): infer from Git tag
-APP_VERSION    := 1.0.0-$(shell git rev-parse HEAD)
+APP_VERSION    := $(shell git describe --match 'v[0-9]*' --tags --abbrev=0 --always HEAD)
 LDFLAGS        := -w -s
 GOFLAGS        :=
 GOPROXY        := https://proxy.golang.org
@@ -21,6 +21,10 @@ LOG            := "$(CURDIR)/scripts/make-log-wrapper.sh"
 
 .PHONY: default
 default: build
+
+.PHONY: version
+version:
+	@echo $(APP_VERSION)
 
 .PHONY: release
 release:

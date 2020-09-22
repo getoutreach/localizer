@@ -23,6 +23,7 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/jaredallard/localizer/internal/expose"
 	"github.com/jaredallard/localizer/internal/kube"
 	"github.com/jaredallard/localizer/internal/proxier"
@@ -111,9 +112,16 @@ func main() { //nolint:funlen,gocyclo
 					if err != nil {
 						return errors.Wrapf(err, "failed to get service '%s'", service)
 					}
-					servicePorts, err := kube.ResolveServicePorts(ctx, k, s)
+
+					servicePorts, exists, err := kube.ResolveServicePorts(ctx, k, s)
 					if err != nil {
 						return errors.Wrap(err, "failed to resolve service ports")
+					}
+					spew.Dump(servicePorts)
+
+					// if there's no endpoints
+					if !exists {
+						log.Debug("service has no endpoints")
 					}
 
 					e := expose.NewExposer(k, kconf, log)
