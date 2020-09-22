@@ -48,7 +48,7 @@ func (pc *ProxyConnection) GetPort() string {
 
 // Start starts a proxy connection
 func (pc *ProxyConnection) Start(ctx context.Context) error {
-	fw, err := kube.CreatePortForward(ctx, pc.proxier.rest, pc.proxier.kconf, &pc.Pod, pc.GetPort())
+	fw, err := kube.CreatePortForward(ctx, pc.proxier.rest, pc.proxier.kconf, &pc.Pod, pc.IP.IP.String(), pc.GetPort())
 	if err != nil {
 		return errors.Wrap(err, "failed to create port-forward")
 	}
