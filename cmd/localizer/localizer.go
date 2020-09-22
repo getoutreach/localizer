@@ -20,6 +20,7 @@ import (
 	"os"
 	"os/signal"
 	"os/user"
+	"strconv"
 	"strings"
 	"syscall"
 
@@ -32,9 +33,23 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 )
+
+// getUserInput returns user input and prints the given prompt
+func getUserInput(prompt string) (string, error) {
+	fmt.Print(prompt)
+
+	var input string
+	_, err := fmt.Scanln(&input)
+	if err != nil {
+		return "", err
+	}
+
+	return input, err
+}
 
 func main() { //nolint:funlen,gocyclo
 	ctx, cancel := context.WithCancel(context.Background())
@@ -96,6 +111,15 @@ func main() { //nolint:funlen,gocyclo
 				Name:        "expose",
 				Description: "Expose ports for a given service to Kubernetes",
 				Usage:       "expose <service>",
+				Flags: []cli.Flag{
+					&cli.StringSliceFlag{
+						// Note: We should make this true override support
+						// right now this will only work for a targetPort -> another targetPort
+						// and not the noted localPort
+						Name:  "map",
+						Usage: "Map a service's target port to another port, --map targetPortName:remotePort",
+					},
+				},
 				Action: func(c *cli.Context) error {
 					service := c.Args().Get(0)
 					if service == "" {
@@ -113,11 +137,67 @@ func main() { //nolint:funlen,gocyclo
 						return errors.Wrapf(err, "failed to get service '%s'", service)
 					}
 
+					if len(s.Spec.Ports) == 0 {
+						return fmt.Errorf("service had no defined ports")
+					}
+
 					servicePorts, exists, err := kube.ResolveServicePorts(ctx, k, s)
 					if err != nil {
 						return errors.Wrap(err, "failed to resolve service ports")
 					}
-					spew.Dump(servicePorts)
+
+					portOverrides := make(map[string]uint)
+					for _, portOverride := range c.StringSlice("map") {
+						spl := strings.Split(portOverride, ":")
+						if len(spl) != 2 {
+							return fmt.Errorf("invalid port map '%s', expected 'local:remote'", portOverride)
+						}
+
+						local := spl[0]
+						rem := spl[1]
+
+						remote, err := strconv.ParseUint(rem, 10, 0)
+						if err != nil {
+							return errors.Wrapf(err, "failed to parse port map '%s'", portOverride)
+						}
+
+						portOverrides[local] = uint(remote)
+					}
+
+					// if we couldn't find endpoints, check if we mapped the port, if not
+					// then prompt the user
+					if !exists {
+						log.Info("Failed to resolve ports due to endpoints not exists, please use --map or awnser the below prompt(s)")
+						for _, sp := range servicePorts {
+							if sp.TargetPort.Type != intstr.String {
+								continue
+							}
+
+							v, err := getUserInput(fmt.Sprintf("Please enter a port to map '%s' to: ", sp.TargetPort.StrVal))
+							if err != nil {
+								return errors.Wrap(err, "failed to get user input")
+							}
+
+							remote, err := strconv.ParseUint(v, 10, 0)
+							if err != nil {
+								return errors.Wrapf(err, "failed to parse port map '%s'", v)
+							}
+
+							portOverrides[strconv.Itoa(int(sp.Port))] = uint(remote)
+						}
+					}
+
+					mappedServicePorts := make([]kube.ResolvedServicePort, len(portOverrides))
+					for i, sp := range servicePorts {
+						mappedPort, ok := portOverrides[strconv.Itoa(int(sp.Port))]
+						if ok {
+							sp.Port = int32(mappedPort)
+							sp.TargetPort = intstr.FromInt(int(mappedPort))
+						}
+						mappedServicePorts[i] = sp
+					}
+
+					log.WithField("portoverride", "").Debug(spew.Sdump(portOverrides))
 
 					// if there's no endpoints
 					if !exists {
@@ -129,7 +209,7 @@ func main() { //nolint:funlen,gocyclo
 						return err
 					}
 
-					p, err := e.Expose(ctx, servicePorts, serviceSplit[0], serviceSplit[1])
+					p, err := e.Expose(ctx, mappedServicePorts, serviceSplit[0], serviceSplit[1])
 					if err != nil {
 						return errors.Wrap(err, "failed to create reverse port-forward")
 					}

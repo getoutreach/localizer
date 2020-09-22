@@ -102,12 +102,6 @@ func ResolveServicePorts(ctx context.Context, k kubernetes.Interface,
 		// if there are no endpoints, don't resolve, just return them
 		servicePorts := make([]ResolvedServicePort, len(s.Spec.Ports))
 		for i, sp := range s.Spec.Ports {
-			// convert the named port into the original port, since we can't exactly resolve
-			// it :(
-			if sp.TargetPort.Type == intstr.String {
-				sp.TargetPort = intstr.FromInt(int(sp.Port))
-			}
-
 			servicePorts[i] = ResolvedServicePort{
 				sp,
 				"",
