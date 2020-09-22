@@ -187,7 +187,7 @@ func main() { //nolint:funlen,gocyclo
 						}
 					}
 
-					mappedServicePorts := make([]kube.ResolvedServicePort, len(portOverrides))
+					mappedServicePorts := make([]kube.ResolvedServicePort, len(servicePorts))
 					for i, sp := range servicePorts {
 						mappedPort, ok := portOverrides[strconv.Itoa(int(sp.Port))]
 						if ok {
