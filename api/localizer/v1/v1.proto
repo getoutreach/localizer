@@ -1,0 +1,31 @@
+syntax = "proto3";
+
+package localizer.v1;
+option go_package = "github.com/jaredallard/api/localizer/v1";
+
+enum event {
+  EVENT_NO_EVENT = 0;
+  EVENT_START_ACCEPTING = 1;
+}
+
+message Chunk {
+  // id is used for connection tracking on the TCP side only. Multiple
+  // listeners is not support on the GRPC side on a given port.
+  // +optional
+  string id = 1;
+
+  // port is the remote port that this traffic came from or is meant to go to
+  uint32 port = 2;
+
+  // event is an optional event to be used for various events.
+  // currently it is used for registering new proxy targets
+  // +optional
+  event event = 3;
+
+  // data is the raw data proxied over from TCP
+  bytes data = 4;
+}
+
+service TunnelService {
+  rpc Tunnel (stream Chunk) returns (stream Chunk);
+}
