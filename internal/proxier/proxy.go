@@ -309,45 +309,6 @@ func (p *Proxier) createProxy(ctx context.Context, s *Service) error { //nolint:
 	serviceKey, _ := cache.MetaNamespaceKeyFunc(kserv)
 	podKey, _ := cache.MetaNamespaceKeyFunc(pod)
 
-	if pod.Annotations[ExposedAnnotation] == "true" {
-		// TODO(jaredallard): this should only be done
-		// when a pod has the same port
-		p.log.Debug("found exposed pod, faking port-forward")
-
-		for _, port := range s.Ports {
-			conn := &ProxyConnection{
-				p,
-				nil,
-				nil,
-				port.LocalPort,
-				port.RemotePort,
-				*s,
-				*pod,
-				true,
-			}
-
-			p.connMutex.Lock()
-			if p.activeServices[serviceKey] == nil {
-				p.activeServices[serviceKey] = make([]*ProxyConnection, 0)
-			}
-			p.activeServices[serviceKey] = append(p.activeServices[serviceKey], conn)
-
-			// pod -> []Conn
-			if p.activePods[podKey] == nil {
-				p.activePods[podKey] = make([]*ProxyConnection, 0)
-			}
-			p.activePods[podKey] = append(p.activePods[podKey], conn)
-			p.connMutex.Unlock()
-		}
-
-		p.hosts.AddHosts("127.0.0.1", serviceAddresses(kserv))
-		if err := p.hosts.Save(); err != nil {
-			return errors.Wrap(err, "failed to save address to hosts")
-		}
-
-		return nil
-	}
-
 	if pod.Status.Phase != corev1.PodRunning {
 		return fmt.Errorf("selected pod wasn't running, got status: %v", pod.Status.Phase)
 	}
