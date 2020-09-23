@@ -64,7 +64,7 @@ gobuild:
 .PHONY: docker-build-push
 docker-build-push:
 	@$(LOG) info "Building and push docker image"
-	docker buildx build --platform linux/amd64,linux/arm64 -t "jaredallard/localizer:latest" --push .
+	DOCKER_BUILDKIT=1 docker build -t "jaredallard/localizer:latest" .
 
 .PHONY: fmt
 fmt:

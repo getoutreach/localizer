@@ -20,6 +20,6 @@ require (
 )
 
 replace (
-	github.com/omrikiei/ktunnel => github.com/jaredallard/ktunnel v1.2.8-beta.0.20200920054848-a3baf9c215e6
+	github.com/omrikiei/ktunnel => github.com/jaredallard/ktunnel v1.2.8-beta.0.20200923003654-e99eb86e62e4
 	k8s.io/client-go => github.com/jaredallard/client-go v0.0.0-20200919203213-e55c7f2b41ab
 )
