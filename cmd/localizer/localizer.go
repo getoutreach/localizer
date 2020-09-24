@@ -211,7 +211,7 @@ func main() { //nolint:funlen,gocyclo
 
 					p, err := e.Expose(ctx, mappedServicePorts, serviceSplit[0], serviceSplit[1])
 					if err != nil {
-						return errors.Wrap(err, "failed to create reverse port-forward")
+						return errors.Wrap(err, "failed to create reverse tunnel")
 					}
 
 					return p.Start(ctx)

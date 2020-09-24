@@ -60,10 +60,12 @@ type Proxier struct {
 
 	// active{,services,Pods} are mapping indexes for
 	// ProxyConnections
-	connMutex      sync.Mutex
-	serviceIPs     map[string]*ipam.IP
-	activeServices map[string][]*ProxyConnection
-	activePods     map[string][]*ProxyConnection
+	connMutex  sync.Mutex
+	ipMutex    sync.Mutex
+	serviceIPs map[string]*ipam.IP
+
+	activeServices map[string]*ProxyConnection
+	activePods     map[string]*ProxyConnection
 }
 
 // NewProxier creates a new proxier instance
@@ -96,8 +98,8 @@ func NewProxier(k kubernetes.Interface, kconf *rest.Config, l logrus.FieldLogger
 		ipamPrefix: prefix,
 
 		serviceIPs:     make(map[string]*ipam.IP),
-		activePods:     make(map[string][]*ProxyConnection),
-		activeServices: make(map[string][]*ProxyConnection),
+		activePods:     make(map[string]*ProxyConnection),
+		activeServices: make(map[string]*ProxyConnection),
 	}
 }
 
@@ -158,68 +160,63 @@ func (p *Proxier) handleInformerEvent(ctx context.Context, event string, obj int
 			// so, we mimic the pod dead event
 			pc := obj.(*ProxyConnection)
 			k, _ = cache.MetaNamespaceKeyFunc(&pc.Pod)
-			p.log.Infof("underlying connection died for %d (-> %s:%d)", pc.LocalPort, k, pc.RemotePort)
+			p.log.Warnf("underlying connection died for %s", k)
 		}
 
-		refreshServices := make([]Service, len(p.activePods[k]))
-		refreshPorts := make([]string, len(p.activePods[k]))
-
+		// skip pods we don't know about
 		p.connMutex.Lock()
-		for i, pc := range p.activePods[k] {
-			refreshServices[i] = pc.Service
-			refreshPorts[i] = pc.GetPort()
-			pc.Close()
+		pc := p.activePods[k]
+		if pc == nil {
+			p.connMutex.Unlock()
+			return
 		}
+
+		pc.Close()
+
+		s := pc.Service
 
 		// reset the activePods
 		p.activePods[k] = nil
 		p.connMutex.Unlock()
 
-		if len(refreshPorts) > 0 {
-			p.log.WithField("ports", refreshPorts).
-				Warnf("port-forward for %s is being refreshed due to underlying pod being destroyed", k)
-		}
-
-		for _, s := range refreshServices {
-			ticker := backoff.NewTicker(backoff.NewExponentialBackOff())
-			for {
-				select {
-				case <-ticker.C:
-					if err := p.createProxy(ctx, &s); err != nil { //nolint:scopelint
-						p.log.Warnf("failed to refresh port-forward for %s: %v (trying again)", k, err)
-					}
-					ticker.Stop()
-					p.log.WithField("ports", refreshPorts).
-						Infof("refreshed port-forward(s) for '%s'", k)
-					return
-				case <-ctx.Done():
-					return
+		p.log.Warnf("tunnel for %s is being refreshed due to underlying pod being destroyed", k)
+		ticker := backoff.NewTicker(backoff.NewExponentialBackOff())
+		for {
+			select {
+			case <-ticker.C:
+				if err := p.createProxy(ctx, &s); err != nil { //nolint:scopelint
+					p.log.WithError(err).Warnf("failed to refresh tunnel for %s (trying again)", k)
 				}
+				ticker.Stop()
+				p.log.Infof("refreshed tunnel for '%s'", k)
+				return
+			case <-ctx.Done():
+				return
 			}
 		}
 
 	case "service":
-		removedPorts := make([]string, len(p.activeServices[k]))
-
 		p.connMutex.Lock()
-		for i, pc := range p.activeServices[k] {
-			removedPorts[i] = pc.GetPort()
-			pc.Close()
+		defer p.connMutex.Unlock()
+
+		// ignore services we don't know anything abou
+		pc := p.activeServices[k]
+		if pc == nil {
+			return
 		}
+
+		// close the underlying port-forward
+		pc.Close()
 
 		// reset the activeServices section for this service
 		p.activeServices[k] = nil
-		p.connMutex.Unlock()
 
 		p.hosts.RemoveAddresses(serviceAddresses(obj.(*corev1.Service)))
 		if err := p.hosts.Save(); err != nil {
 			p.log.Warnf("failed to clean hosts file: %v", err)
 		}
 
-		if len(removedPorts) > 0 {
-			p.log.WithField("ports", removedPorts).
-				Warnf("port-forward for %s has been destroyed due to the underlying service being deleted", k)
-		}
+		p.log.Warnf("tunnel for %s has been destroyed due to the underlying service being deleted", k)
 	}
 }
 
@@ -287,6 +284,33 @@ func (p *Proxier) findPodBySelector(o runtime.Object) (*corev1.Pod, error) {
 	return pod, err
 }
 
+// allocateIP allocates an ip for a given service key
+func (p *Proxier) allocateIP(serviceKey string) (*ipam.IP, error) {
+	p.ipMutex.Lock()
+	defer p.ipMutex.Unlock()
+
+	ipAddress := p.serviceIPs[serviceKey]
+	if ipAddress == nil {
+		var err error
+		ipAddress, err = p.ipam.AcquireIP(p.ipamPrefix.Cidr)
+		if err != nil {
+			return nil, err
+		}
+
+		// TODO(jaredallard): This logic should be moved into the
+		// actual proxy connection
+		args := []string{"lo0", "alias", ipAddress.IP.String(), "up"}
+		if err := exec.Command("ifconfig", args...).Run(); err != nil {
+			return nil, errors.Wrap(err, "failed to create ip link")
+		}
+
+		p.log.WithField("service", serviceKey).Debugf("allocated ip address %s", ipAddress.IP)
+		p.serviceIPs[serviceKey] = ipAddress
+	}
+
+	return p.serviceIPs[serviceKey], nil
+}
+
 // createProxy creates a proxy connection
 func (p *Proxier) createProxy(ctx context.Context, s *Service) error { //nolint:funlen,gocyclo
 	item, exists, err := p.servStore.GetByKey(fmt.Sprintf("%s/%s", s.Namespace, s.Name))
@@ -313,59 +337,35 @@ func (p *Proxier) createProxy(ctx context.Context, s *Service) error { //nolint:
 		return fmt.Errorf("selected pod wasn't running, got status: %v", pod.Status.Phase)
 	}
 
-	ipAddress := p.serviceIPs[serviceKey]
-	if ipAddress == nil {
-		ipAddress, err = p.ipam.AcquireIP(p.ipamPrefix.Cidr)
-		if err != nil {
-			return errors.Wrap(err, "failed to allocate IP address")
-		}
-
-		args := []string{"lo0", "alias", ipAddress.IP.String(), "up"}
-		if err := exec.Command("ifconfig", args...).Run(); err != nil {
-			return errors.Wrap(err, "failed to create ip link")
-		}
-
-		p.serviceIPs[serviceKey] = ipAddress
+	ports := make([]string, len(s.Ports))
+	for i, port := range s.Ports {
+		ports[i] = fmt.Sprintf("%d:%d", port.LocalPort, port.RemotePort)
 	}
 
-	for _, port := range s.Ports {
-		p.log.Infof("creating port-forward '%s:%d'", serviceKey, port.RemotePort)
+	p.log.Infof("creating tunnel for service %s", serviceKey)
 
-		// build the linking tables
-		// port -> conn
-		p.connMutex.Lock()
-		conn := &ProxyConnection{
-			p,
-			nil,
+	ipAddress, err := p.allocateIP(serviceKey)
+	if err != nil {
+		return errors.Wrap(err, "failed to allocate IP")
+	}
 
-			ipAddress,
-			port.LocalPort,
-			port.RemotePort,
-			*s,
-			*pod,
-			false,
-		}
+	p.connMutex.Lock()
+	p.activeServices[serviceKey] = &ProxyConnection{
+		proxier: p,
+		IP:      ipAddress,
+		Ports:   ports,
+		Service: *s,
+		Pod:     *pod,
+	}
+	p.activePods[podKey] = p.activeServices[serviceKey]
+	p.connMutex.Unlock()
 
-		// service -> []Conn
-		if p.activeServices[serviceKey] == nil {
-			p.activeServices[serviceKey] = make([]*ProxyConnection, 0)
-		}
-		p.activeServices[serviceKey] = append(p.activeServices[serviceKey], conn)
-
-		// pod -> []Conn
-		if p.activePods[podKey] == nil {
-			p.activePods[podKey] = make([]*ProxyConnection, 0)
-		}
-		p.activePods[podKey] = append(p.activePods[podKey], conn)
-		p.connMutex.Unlock()
-
-		// start the proxy
-		if err := conn.Start(ctx); err != nil {
-			p.log.Errorf(
-				"failed to start proxy for '%s:%d'",
-				serviceKey, port.RemotePort, port.LocalPort, err,
-			)
-		}
+	// start the proxy
+	if err := p.activeServices[serviceKey].Start(ctx); err != nil {
+		p.log.WithError(err).Errorf(
+			"failed to start proxy for %s",
+			serviceKey,
+		)
 	}
 
 	// only add addresses for services we actually are routing to
@@ -380,25 +380,40 @@ func (p *Proxier) createProxy(ctx context.Context, s *Service) error { //nolint:
 
 // Proxy starts a proxier.
 func (p *Proxier) Proxy(ctx context.Context) error {
-createLoop:
+	var wg sync.WaitGroup
 	for _, s := range p.s {
-		ticker := backoff.NewTicker(backoff.NewExponentialBackOff())
-	createIteratorLoop:
-		for {
-			select {
-			case <-ticker.C:
-				if err := p.createProxy(ctx, &s); err != nil { //nolint:scopelint
-					p.log.Warnf("failed to create port-forward for '%s/%s': %v (trying again)", s.Namespace, s.Name, err)
+		wg.Add(1)
+
+		// spawn a goroutine to create the tunnel
+		go func(s Service) {
+			ticker := backoff.NewTicker(backoff.NewExponentialBackOff())
+		createLoop:
+			for {
+				select {
+				case <-ticker.C:
+					if err := p.createProxy(ctx, &s); err != nil { //nolint:scopelint
+						p.log.WithError(err).Warnf("failed to create tunnel for '%s/%s' (trying again)", s.Namespace, s.Name)
+						continue
+					}
+					ticker.Stop()
+					break createLoop
+				case <-ctx.Done():
+					break createLoop
 				}
-				ticker.Stop()
-				break createIteratorLoop
-			case <-ctx.Done():
-				break createLoop
 			}
-		}
+
+			wg.Done()
+		}(s)
 	}
 
+	// wait for all of the proxies to be up
+	wg.Wait()
+
+	p.log.Info("all tunnels created successfully")
+
+	// wait for the process to be terminated
 	<-ctx.Done()
+
 	p.log.Info("cleaning up ...")
 
 	for k := range p.activeServices {
@@ -420,7 +435,7 @@ createLoop:
 	}
 
 	for _, ip := range p.serviceIPs {
-		args := []string{"lo0", "-alias", ip.IP.String(), "up"}
+		args := []string{"lo0", "-alias", ip.IP.String()}
 		if err := exec.Command("ifconfig", args...).Run(); err != nil {
 			return errors.Wrapf(err, "failed to remove ip alias '%s'", ip.IP.String())
 		}
