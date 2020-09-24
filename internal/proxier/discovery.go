@@ -25,7 +25,6 @@ import (
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/tools/cache"
 )
 
 const (
@@ -41,6 +40,11 @@ type Service struct {
 	Name      string
 	Namespace string
 	Ports     []*ServicePort
+}
+
+// GetKey returns a cache stable key for a Service
+func (s *Service) GetKey() string {
+	return fmt.Sprintf("%s/%s", s.Namespace, s.Name)
 }
 
 // ServicePort defines a port that is exposed
@@ -88,17 +92,12 @@ func (d *Discoverer) Discover(ctx context.Context) ([]Service, error) { //nolint
 				continue
 			}
 
-			k, _ := cache.MetaNamespaceKeyFunc(kserv)
-			if k == "" {
-				// Note: this likely does nothing, just checking
-				k = fmt.Sprintf("%s/%s", kserv.Name, kserv.Namespace)
-			}
-
 			serv := Service{
 				Name:      kserv.Name,
 				Namespace: kserv.Namespace,
 				Ports:     make([]*ServicePort, 0),
 			}
+			k := serv.GetKey()
 
 			// skip services that have no ports
 			if len(kserv.Spec.Ports) == 0 {

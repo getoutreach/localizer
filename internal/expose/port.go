@@ -58,10 +58,10 @@ func (s *scaledObjectType) GetKey() string {
 }
 
 func (p *ServiceForward) createServerPortForward(ctx context.Context, po *corev1.Pod) (*portforward.PortForwarder, error) {
-	return kube.CreatePortForward(ctx, p.c.k.CoreV1().RESTClient(), p.c.kconf, po, "0.0.0.0", []string{"50:50"})
+	return kube.CreatePortForward(ctx, p.c.k.CoreV1().RESTClient(), p.c.kconf, po, "0.0.0.0", []string{"0:50"})
 }
 
-func (p *ServiceForward) createServerPodAndTransport(ctx context.Context) (func(), error) { //nolint:funlen,gocyclo
+func (p *ServiceForward) createServerPodAndTransport(ctx context.Context) (func(), int, error) { //nolint:funlen,gocyclo
 	// map the service ports into containerPorts, using the
 	containerPorts := make([]corev1.ContainerPort, len(p.Ports))
 	for i, port := range p.Ports {
@@ -79,7 +79,7 @@ func (p *ServiceForward) createServerPodAndTransport(ctx context.Context) (func(
 	// create a pod for our new expose service
 	exposedPortsJSON, err := json.Marshal(containerPorts)
 	if err != nil {
-		return func() {}, err
+		return func() {}, 0, err
 	}
 
 	podObject := &corev1.Pod{
@@ -125,7 +125,7 @@ func (p *ServiceForward) createServerPodAndTransport(ctx context.Context) (func(
 
 	po, err := p.c.k.CoreV1().Pods(p.Namespace).Create(ctx, podObject, metav1.CreateOptions{})
 	if err != nil {
-		return func() {}, errors.Wrap(err, "failed to create pod")
+		return func() {}, 0, errors.Wrap(err, "failed to create pod")
 	}
 
 	p.c.log.Infof("created pod %s", po.ObjectMeta.Name)
@@ -154,7 +154,7 @@ loop:
 				}
 			}
 		case <-ctx.Done():
-			return func() {}, ctx.Err()
+			return func() {}, 0, ctx.Err()
 		}
 	}
 
@@ -162,7 +162,7 @@ loop:
 
 	fw, err := p.createServerPortForward(ctx, po)
 	if err != nil {
-		return func() {}, errors.Wrap(err, "failed to create tunnel for underlying transport")
+		return func() {}, 0, errors.Wrap(err, "failed to create tunnel for underlying transport")
 	}
 
 	fw.Ready = make(chan struct{})
@@ -177,7 +177,23 @@ loop:
 	select {
 	case <-fw.Ready:
 	case <-ctx.Done():
-		return func() {}, ctx.Err()
+		return func() {}, 0, ctx.Err()
+	}
+
+	ports, err := fw.GetPorts()
+	if err != nil {
+		return func() {}, 0, errors.Wrap(err, "failed to get generated underlying transport port")
+	}
+
+	port := 0
+	for _, p := range ports {
+		if p.Remote == 50 {
+			port = int(p.Local)
+		}
+	}
+
+	if port == 0 {
+		return func() {}, 0, fmt.Errorf("failed to determine the generated underlying transport port")
 	}
 
 	return func() {
@@ -185,7 +201,7 @@ loop:
 		// cleanup the pod
 		//nolint:errcheck
 		p.c.k.CoreV1().Pods(p.Namespace).Delete(context.Background(), po.Name, metav1.DeleteOptions{})
-	}, nil
+	}, port, nil
 }
 
 // Start starts forwarding a service
@@ -196,7 +212,7 @@ func (p *ServiceForward) Start(ctx context.Context) error {
 		ports[i] = fmt.Sprintf("%d:%d", prt, prt)
 	}
 
-	cleanupFn, err := p.createServerPodAndTransport(ctx)
+	cleanupFn, localPort, err := p.createServerPodAndTransport(ctx)
 	if err != nil {
 		return errors.Wrap(err, "failed to create server and/or transport")
 	}
@@ -204,7 +220,6 @@ func (p *ServiceForward) Start(ctx context.Context) error {
 
 	// TODO(jaredallard): We likely need reconnect logic here
 	host := "127.0.0.1"
-	port := 50
 	tls := false
 
 	// scale down the other resources that powered this service
@@ -225,7 +240,7 @@ func (p *ServiceForward) Start(ctx context.Context) error {
 	}()
 
 	p.c.log.Debug("creating ktunnel client")
-	err = client.RunClient(ctx, &host, &port, "tcp", &tls, nil, nil, ports)
+	err = client.RunClient(ctx, &host, &localPort, "tcp", &tls, nil, nil, ports)
 	if err != nil {
 		return errors.Wrap(err, "failed to create grpc transport")
 	}

@@ -174,21 +174,23 @@ func (p *Proxier) handleInformerEvent(ctx context.Context, event string, obj int
 		pc.Close()
 
 		s := pc.Service
+		serviceKey := s.GetKey()
 
 		// reset the activePods
 		p.activePods[k] = nil
 		p.connMutex.Unlock()
 
-		p.log.Warnf("tunnel for %s is being refreshed due to underlying pod being destroyed", k)
+		p.log.Warnf("tunnel for %s is being refreshed due to underlying pod being destroyed", serviceKey)
 		ticker := backoff.NewTicker(backoff.NewExponentialBackOff())
 		for {
 			select {
 			case <-ticker.C:
 				if err := p.createProxy(ctx, &s); err != nil { //nolint:scopelint
-					p.log.WithError(err).Warnf("failed to refresh tunnel for %s (trying again)", k)
+					p.log.WithError(err).Warnf("failed to refresh tunnel for %s (trying again)", serviceKey)
+					continue
 				}
 				ticker.Stop()
-				p.log.Infof("refreshed tunnel for '%s'", k)
+				p.log.Infof("refreshed tunnel for '%s'", serviceKey)
 				return
 			case <-ctx.Done():
 				return
@@ -199,7 +201,7 @@ func (p *Proxier) handleInformerEvent(ctx context.Context, event string, obj int
 		p.connMutex.Lock()
 		defer p.connMutex.Unlock()
 
-		// ignore services we don't know anything abou
+		// ignore services we don't know anything about
 		pc := p.activeServices[k]
 		if pc == nil {
 			return
