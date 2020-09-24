@@ -69,7 +69,7 @@ func GetKubeClient(contextName string) (*rest.Config, kubernetes.Interface, erro
 }
 
 func CreatePortForward(ctx context.Context, r rest.Interface, rc *rest.Config,
-	p *corev1.Pod, ip, port string) (*portforward.PortForwarder, error) {
+	p *corev1.Pod, ip string, ports []string) (*portforward.PortForwarder, error) {
 	req := r.Post().
 		Resource("pods").
 		Namespace(p.Namespace).
@@ -82,7 +82,7 @@ func CreatePortForward(ctx context.Context, r rest.Interface, rc *rest.Config,
 	}
 	dialer := spdy.NewDialer(upgrader, &http.Client{Transport: transport}, "POST", req.URL())
 
-	return portforward.NewOnAddresses(dialer, []string{ip}, []string{port}, ctx.Done(), nil, ioutil.Discard, ioutil.Discard)
+	return portforward.NewOnAddresses(dialer, []string{ip}, ports, ctx.Done(), nil, ioutil.Discard, ioutil.Discard)
 }
 
 type ResolvedServicePort struct {

@@ -58,7 +58,7 @@ func (s *scaledObjectType) GetKey() string {
 }
 
 func (p *ServiceForward) createServerPortForward(ctx context.Context, po *corev1.Pod) (*portforward.PortForwarder, error) {
-	return kube.CreatePortForward(ctx, p.c.k.CoreV1().RESTClient(), p.c.kconf, po, "0.0.0.0", "50:50")
+	return kube.CreatePortForward(ctx, p.c.k.CoreV1().RESTClient(), p.c.kconf, po, "0.0.0.0", []string{"50:50"})
 }
 
 func (p *ServiceForward) createServerPodAndTransport(ctx context.Context) (func(), error) { //nolint:funlen,gocyclo
@@ -158,11 +158,11 @@ loop:
 		}
 	}
 
-	p.c.log.Info("pod is ready, creating port-forward(s)")
+	p.c.log.Info("pod is ready, creating tunnel")
 
 	fw, err := p.createServerPortForward(ctx, po)
 	if err != nil {
-		return func() {}, errors.Wrap(err, "failed to create port-forward for underlying transport")
+		return func() {}, errors.Wrap(err, "failed to create tunnel for underlying transport")
 	}
 
 	fw.Ready = make(chan struct{})

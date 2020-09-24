@@ -15,12 +15,13 @@ package proxier
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/jaredallard/localizer/internal/kube"
 	"github.com/metal-stack/go-ipam"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/portforward"
 )
 
@@ -29,32 +30,26 @@ type ProxyConnection struct {
 	proxier *Proxier
 	fw      *portforward.PortForwarder
 
-	IP         *ipam.IP
-	LocalPort  uint
-	RemotePort uint
+	// IP is the dedicated IP for this tunnel
+	IP *ipam.IP
 
+	// Ports is an array of local:remote ports
+	Ports []string
+
+	// Service is the service that this proxy is connected too
 	Service Service
-	Pod     corev1.Pod
 
-	// Active denotes if this connection is active
-	// or not
-	Active bool
-}
-
-// GetPort returns the port as a string local:remote
-func (pc *ProxyConnection) GetPort() string {
-	return fmt.Sprintf("%d:%d", pc.LocalPort, pc.RemotePort)
+	// Pod is the pod powering this proxy
+	Pod corev1.Pod
 }
 
 // Start starts a proxy connection
 func (pc *ProxyConnection) Start(ctx context.Context) error {
-	fw, err := kube.CreatePortForward(ctx, pc.proxier.rest, pc.proxier.kconf, &pc.Pod, pc.IP.IP.String(), pc.GetPort())
+	fw, err := kube.CreatePortForward(ctx, pc.proxier.rest, pc.proxier.kconf, &pc.Pod, pc.IP.IP.String(), pc.Ports)
 	if err != nil {
-		return errors.Wrap(err, "failed to create port-forward")
+		return errors.Wrap(err, "failed to create tunnel")
 	}
 	pc.fw = fw
-
-	pc.Active = true
 
 	go func() {
 		// TODO(jaredallard): Figure out a way to better backoff errors here
@@ -64,7 +59,13 @@ func (pc *ProxyConnection) Start(ctx context.Context) error {
 			pc.Close()
 			pc.fw = nil
 
-			pc.proxier.log.WithField("port", pc.GetPort()).Debug("port-forward died")
+			k, _ := cache.MetaNamespaceKeyFunc(pc.Service)
+			pc.proxier.log.WithError(err).WithFields(logrus.Fields{
+				"ports":   pc.Ports,
+				"service": k,
+			}).Debug("tunnel died")
+
+			// trigger the recreate logic
 			pc.proxier.handleInformerEvent(ctx, "connection-dead", pc)
 		}
 	}()
@@ -75,14 +76,13 @@ func (pc *ProxyConnection) Start(ctx context.Context) error {
 // Close closes the current proxy connection and marks it as
 // no longer being active
 func (pc *ProxyConnection) Close() error {
-	pc.Active = false
-
 	// note: If the parent context was canceled
 	// this has already been closed
 	if pc.fw != nil {
 		pc.fw.Close()
 	}
 
+	// if we had an ip address, free it
 	if pc.IP != nil {
 		_, err := pc.proxier.ipam.ReleaseIP(pc.IP)
 		if err != nil {
