@@ -61,7 +61,7 @@ func (p *ServiceForward) createServerPortForward(ctx context.Context, po *corev1
 	return kube.CreatePortForward(ctx, p.c.k.CoreV1().RESTClient(), p.c.kconf, po, "0.0.0.0", []string{"0:50"})
 }
 
-func (p *ServiceForward) createServerPodAndTransport(ctx context.Context) (func(), int, error) { //nolint:funlen,gocyclo
+func (p *ServiceForward) createServerPodAndTransport(ctx context.Context) (cleanupFn func(), port int, err error) { //nolint:funlen,gocyclo
 	// map the service ports into containerPorts, using the
 	containerPorts := make([]corev1.ContainerPort, len(p.Ports))
 	for i, port := range p.Ports {
@@ -185,7 +185,6 @@ loop:
 		return func() {}, 0, errors.Wrap(err, "failed to get generated underlying transport port")
 	}
 
-	port := 0
 	for _, p := range ports {
 		if p.Remote == 50 {
 			port = int(p.Local)
