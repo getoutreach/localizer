@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"os/exec"
 	"reflect"
+	"runtime"
 	"sort"
 	"sync"
 	"time"
@@ -30,7 +31,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
-	"k8s.io/apimachinery/pkg/runtime"
+	kruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
@@ -275,7 +276,7 @@ func (p *Proxier) Add(s ...Service) error {
 }
 
 // findPodBySelector finds a pod by a given selector on a runtime.Object
-func (p *Proxier) findPodBySelector(o runtime.Object) (*corev1.Pod, error) {
+func (p *Proxier) findPodBySelector(o kruntime.Object) (*corev1.Pod, error) {
 	namespace, selector, err := polymorphichelpers.SelectorsForObject(o)
 	if err != nil {
 		return nil, fmt.Errorf("cannot attach to %T: %v", o, err)
@@ -299,11 +300,15 @@ func (p *Proxier) allocateIP(serviceKey string) (*ipam.IP, error) {
 			return nil, err
 		}
 
-		// TODO(jaredallard): This logic should be moved into the
-		// actual proxy connection
-		args := []string{"lo0", "alias", ipAddress.IP.String(), "up"}
-		if err := exec.Command("ifconfig", args...).Run(); err != nil {
-			return nil, errors.Wrap(err, "failed to create ip link")
+		// We only need to create alias on darwin, on other platforms
+		// lo0 becomes lo and routes the full /8
+		if runtime.GOOS == "darwin" {
+			// TODO(jaredallard): This logic should be moved into the
+			// actual proxy connection
+			args := []string{"lo0", "alias", ipAddress.IP.String(), "up"}
+			if err := exec.Command("ifconfig", args...).Run(); err != nil {
+				return nil, errors.Wrap(err, "failed to create ip link")
+			}
 		}
 
 		p.log.WithField("service", serviceKey).Debugf("allocated ip address %s", ipAddress.IP)
@@ -436,10 +441,14 @@ func (p *Proxier) Proxy(ctx context.Context) error {
 		}
 	}
 
-	for _, ip := range p.serviceIPs {
-		args := []string{"lo0", "-alias", ip.IP.String()}
-		if err := exec.Command("ifconfig", args...).Run(); err != nil {
-			return errors.Wrapf(err, "failed to remove ip alias '%s'", ip.IP.String())
+	// if we're on a platform that needed ip aliasing, cleanup
+	// all of the ip aliases
+	if runtime.GOOS == "darwin" {
+		for _, ip := range p.serviceIPs {
+			args := []string{"lo0", "-alias", ip.IP.String()}
+			if err := exec.Command("ifconfig", args...).Run(); err != nil {
+				return errors.Wrapf(err, "failed to remove ip alias '%s'", ip.IP.String())
+			}
 		}
 	}
 
