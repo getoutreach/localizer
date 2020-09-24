@@ -396,10 +396,11 @@ func (p *Proxier) Proxy(ctx context.Context) error {
 	p.log.Info("cleaning up ...")
 
 	p.connMutex.Lock()
-	for _, pc := range p.activeServices {
+	for k, pc := range p.activeServices {
 		if err := pc.Close(); err != nil {
-			p.log.WithField("service", pc.Service.GetKey()).WithError(err).Debug("failed to close proxy connection")
+			p.log.WithField("service", k).WithError(err).Debug("failed to close proxy connection")
 		}
+		p.activeServices[k] = nil
 	}
 	p.connMutex.Unlock()
 

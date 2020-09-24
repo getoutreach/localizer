@@ -61,19 +61,18 @@ func (pc *ProxyConnection) GetAddresses() []string {
 
 // Start starts a proxy connection
 func (pc *ProxyConnection) Start(ctx context.Context) error {
-	fw, err := kube.CreatePortForward(ctx, pc.proxier.rest, pc.proxier.kconf, &pc.Pod, pc.IP.IP.String(), pc.Ports)
-	if err != nil {
-		return errors.Wrap(err, "failed to create tunnel")
-	}
-	pc.fw = fw
-
 	serviceKey := pc.Service.GetKey()
-
 	ipAddress, err := pc.proxier.allocateIP(serviceKey)
 	if err != nil {
 		return errors.Wrap(err, "failed to allocate IP")
 	}
 	pc.IP = ipAddress
+
+	fw, err := kube.CreatePortForward(ctx, pc.proxier.rest, pc.proxier.kconf, &pc.Pod, pc.IP.IP.String(), pc.Ports)
+	if err != nil {
+		return errors.Wrap(err, "failed to create tunnel")
+	}
+	pc.fw = fw
 
 	// only add addresses for services we actually are routing to
 	pc.proxier.log.Debugf("adding hosts file entry for service '%s'", serviceKey)
@@ -107,6 +106,11 @@ func (pc *ProxyConnection) Start(ctx context.Context) error {
 // Close closes the current proxy connection and marks it as
 // no longer being active
 func (pc *ProxyConnection) Close() error {
+	// if it's nil then it's already been cleaned up
+	if pc == nil {
+		return nil
+	}
+
 	// note: If the parent context was canceled
 	// this has already been closed
 	if pc.fw != nil {
@@ -141,6 +145,5 @@ func (pc *ProxyConnection) Close() error {
 		pc.proxier.serviceIPs[pc.Service.GetKey()] = nil
 	}
 
-	// we'll return an error one day
 	return nil
 }
