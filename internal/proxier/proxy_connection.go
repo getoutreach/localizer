@@ -15,6 +15,9 @@ package proxier
 
 import (
 	"context"
+	"fmt"
+	"os/exec"
+	"runtime"
 
 	"github.com/jaredallard/localizer/internal/kube"
 	"github.com/metal-stack/go-ipam"
@@ -43,6 +46,19 @@ type ProxyConnection struct {
 	Pod corev1.Pod
 }
 
+// GetAddresses returns all of the valid addresses
+// for a given kubernetes service
+func (pc *ProxyConnection) GetAddresses() []string {
+	s := pc.Service
+	return []string{
+		s.Name,
+		fmt.Sprintf("%s.%s", s.Name, s.Namespace),
+		fmt.Sprintf("%s.%s.svc", s.Name, s.Namespace),
+		fmt.Sprintf("%s.%s.svc.cluster", s.Name, s.Namespace),
+		fmt.Sprintf("%s.%s.svc.cluster.local", s.Name, s.Namespace),
+	}
+}
+
 // Start starts a proxy connection
 func (pc *ProxyConnection) Start(ctx context.Context) error {
 	fw, err := kube.CreatePortForward(ctx, pc.proxier.rest, pc.proxier.kconf, &pc.Pod, pc.IP.IP.String(), pc.Ports)
@@ -50,6 +66,21 @@ func (pc *ProxyConnection) Start(ctx context.Context) error {
 		return errors.Wrap(err, "failed to create tunnel")
 	}
 	pc.fw = fw
+
+	serviceKey := pc.Service.GetKey()
+
+	ipAddress, err := pc.proxier.allocateIP(serviceKey)
+	if err != nil {
+		return errors.Wrap(err, "failed to allocate IP")
+	}
+	pc.IP = ipAddress
+
+	// only add addresses for services we actually are routing to
+	pc.proxier.log.Debugf("adding hosts file entry for service '%s'", serviceKey)
+	pc.proxier.hosts.AddHosts(pc.IP.IP.String(), pc.GetAddresses())
+	if err := pc.proxier.hosts.Save(); err != nil {
+		return errors.Wrap(err, "failed to save address to hosts")
+	}
 
 	go func() {
 		// TODO(jaredallard): Figure out a way to better backoff errors here
@@ -82,12 +113,32 @@ func (pc *ProxyConnection) Close() error {
 		pc.fw.Close()
 	}
 
-	// if we had an ip address, free it
+	// cleanup the DNS entries for this ProxyConnection
+	pc.proxier.hosts.RemoveAddresses(pc.GetAddresses())
+	if err := pc.proxier.hosts.Save(); err != nil {
+		return errors.Wrap(err, "failed to remove hosts entry")
+	}
+
+	// if we have an ip we should release it
 	if pc.IP != nil {
-		_, err := pc.proxier.ipam.ReleaseIP(pc.IP)
-		if err != nil {
-			return errors.Wrap(err, "failed to free IP address")
+		// If we are on a platform that needs aliases
+		// then we need to remove it
+		if runtime.GOOS == "darwin" {
+			ipStr := pc.IP.IP.String()
+			args := []string{"lo0", "-alias", ipStr}
+			if err := exec.Command("ifconfig", args...).Run(); err != nil {
+				return errors.Wrapf(err, "failed to remove ip alias '%s'", ipStr)
+			}
 		}
+
+		// release the IP after cleanup, in case it can't be released
+		if _, err := pc.proxier.ipam.ReleaseIP(pc.IP); err != nil {
+			return errors.Wrap(err, "failed to release IP address")
+		}
+
+		pc.proxier.ipMutex.Lock()
+		defer pc.proxier.ipMutex.Unlock()
+		pc.proxier.serviceIPs[pc.Service.GetKey()] = nil
 	}
 
 	// we'll return an error one day

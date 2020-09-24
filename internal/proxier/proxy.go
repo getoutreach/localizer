@@ -29,7 +29,6 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/txn2/txeh"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	kruntime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
@@ -104,29 +103,18 @@ func NewProxier(k kubernetes.Interface, kconf *rest.Config, l logrus.FieldLogger
 	}
 }
 
-// serviceAddresses returns all of the valid addresses
-// for a given kubernetes service
-func serviceAddresses(s *corev1.Service) []string {
-	return []string{
-		s.Name,
-		fmt.Sprintf("%s.%s", s.Name, s.Namespace),
-		fmt.Sprintf("%s.%s.svc", s.Name, s.Namespace),
-		fmt.Sprintf("%s.%s.svc.cluster", s.Name, s.Namespace),
-		fmt.Sprintf("%s.%s.svc.cluster.local", s.Name, s.Namespace),
-	}
-}
-
 func (p *Proxier) handleInformerEvent(ctx context.Context, event string, obj interface{}) { //nolint:funlen,gocyclo
 	k, _ := cache.MetaNamespaceKeyFunc(obj)
 
 	item := ""
-	switch obj.(type) {
+	switch tobj := obj.(type) {
 	case *corev1.Pod:
 		item = "pod"
 	case *corev1.Service:
 		item = "service"
 	case *ProxyConnection:
 		item = "connection"
+		k = tobj.Service.GetKey()
 	default:
 		// skip unknown types
 		p.log.WithFields(logrus.Fields{
@@ -172,7 +160,9 @@ func (p *Proxier) handleInformerEvent(ctx context.Context, event string, obj int
 			return
 		}
 
-		pc.Close()
+		if err := pc.Close(); err != nil {
+			p.log.WithField("service", k).WithError(err).Debug("failed to close proxy connection")
+		}
 
 		s := pc.Service
 		serviceKey := s.GetKey()
@@ -209,15 +199,12 @@ func (p *Proxier) handleInformerEvent(ctx context.Context, event string, obj int
 		}
 
 		// close the underlying port-forward
-		pc.Close()
+		if err := pc.Close(); err != nil {
+			p.log.WithField("service", k).WithError(err).Debug("failed to close proxy connection")
+		}
 
 		// reset the activeServices section for this service
 		p.activeServices[k] = nil
-
-		p.hosts.RemoveAddresses(serviceAddresses(obj.(*corev1.Service)))
-		if err := p.hosts.Save(); err != nil {
-			p.log.Warnf("failed to clean hosts file: %v", err)
-		}
 
 		p.log.Warnf("tunnel for %s has been destroyed due to the underlying service being deleted", k)
 	}
@@ -303,8 +290,6 @@ func (p *Proxier) allocateIP(serviceKey string) (*ipam.IP, error) {
 		// We only need to create alias on darwin, on other platforms
 		// lo0 becomes lo and routes the full /8
 		if runtime.GOOS == "darwin" {
-			// TODO(jaredallard): This logic should be moved into the
-			// actual proxy connection
 			args := []string{"lo0", "alias", ipAddress.IP.String(), "up"}
 			if err := exec.Command("ifconfig", args...).Run(); err != nil {
 				return nil, errors.Wrap(err, "failed to create ip link")
@@ -351,15 +336,9 @@ func (p *Proxier) createProxy(ctx context.Context, s *Service) error { //nolint:
 
 	p.log.Infof("creating tunnel for service %s", serviceKey)
 
-	ipAddress, err := p.allocateIP(serviceKey)
-	if err != nil {
-		return errors.Wrap(err, "failed to allocate IP")
-	}
-
 	p.connMutex.Lock()
 	p.activeServices[serviceKey] = &ProxyConnection{
 		proxier: p,
-		IP:      ipAddress,
 		Ports:   ports,
 		Service: *s,
 		Pod:     *pod,
@@ -373,13 +352,6 @@ func (p *Proxier) createProxy(ctx context.Context, s *Service) error { //nolint:
 			"failed to start proxy for %s",
 			serviceKey,
 		)
-	}
-
-	// only add addresses for services we actually are routing to
-	p.log.Debugf("adding hosts file entry for service '%s'", serviceKey)
-	p.hosts.AddHosts(ipAddress.IP.String(), serviceAddresses(kserv))
-	if err := p.hosts.Save(); err != nil {
-		return errors.Wrap(err, "failed to save address to hosts")
 	}
 
 	return nil
@@ -423,34 +395,13 @@ func (p *Proxier) Proxy(ctx context.Context) error {
 
 	p.log.Info("cleaning up ...")
 
-	for k := range p.activeServices {
-		namespace, name, err := cache.SplitMetaNamespaceKey(k)
-		if err != nil {
-			// TODO: handle this
-			continue
-		}
-
-		// cleanup the DNS entries
-		kserv := &corev1.Service{ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: namespace}}
-		addrs := serviceAddresses(kserv)
-
-		p.log.WithField("addresses", addrs).Debug("cleaning up hosts entry")
-		p.hosts.RemoveHosts(addrs)
-		if err := p.hosts.Save(); err != nil {
-			p.log.Warnf("failed to clean hosts file: %v", err)
+	p.connMutex.Lock()
+	for _, pc := range p.activeServices {
+		if err := pc.Close(); err != nil {
+			p.log.WithField("service", pc.Service.GetKey()).WithError(err).Debug("failed to close proxy connection")
 		}
 	}
-
-	// if we're on a platform that needed ip aliasing, cleanup
-	// all of the ip aliases
-	if runtime.GOOS == "darwin" {
-		for _, ip := range p.serviceIPs {
-			args := []string{"lo0", "-alias", ip.IP.String()}
-			if err := exec.Command("ifconfig", args...).Run(); err != nil {
-				return errors.Wrapf(err, "failed to remove ip alias '%s'", ip.IP.String())
-			}
-		}
-	}
+	p.connMutex.Unlock()
 
 	p.log.Info("cleaned up")
 
