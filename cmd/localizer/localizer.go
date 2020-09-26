@@ -37,19 +37,6 @@ import (
 	"k8s.io/client-go/rest"
 )
 
-// getUserInput returns user input and prints the given prompt
-func getUserInput(prompt string) (string, error) {
-	fmt.Print(prompt)
-
-	var input string
-	_, err := fmt.Scanln(&input)
-	if err != nil {
-		return "", err
-	}
-
-	return input, err
-}
-
 func main() { //nolint:funlen,gocyclo
 	ctx, cancel := context.WithCancel(context.Background())
 	log := logrus.New()
