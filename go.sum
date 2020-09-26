@@ -265,6 +265,14 @@ github.com/jaredallard/client-go v0.0.0-20200919203213-e55c7f2b41ab h1:POcVSGYlT
 github.com/jaredallard/client-go v0.0.0-20200919203213-e55c7f2b41ab/go.mod h1:SnLtmp6F+NMdYHYqnSKVWW81iA2wv5QfXXncW8aWuKc=
 github.com/jaredallard/ktunnel v1.2.8-beta.0.20200926055947-16b943a26404 h1:COTI4mawAmM5OLPssFnVCIvwaN92mRubN7MJLMu/XDk=
 github.com/jaredallard/ktunnel v1.2.8-beta.0.20200926055947-16b943a26404/go.mod h1:8tqZSClJ9vDe6gIx/XSrLPZ4PwZiW9X16Y2ujbm3NgA=
+github.com/jaredallard/ktunnel v1.2.8-beta.0.20200926160510-2fbf336cf727 h1:/LSsu67oZN8a+D57pMalTi7mdfa4f1izzTZUSpt3fNw=
+github.com/jaredallard/ktunnel v1.2.8-beta.0.20200926160510-2fbf336cf727/go.mod h1:8tqZSClJ9vDe6gIx/XSrLPZ4PwZiW9X16Y2ujbm3NgA=
+github.com/jaredallard/ktunnel v1.2.8-beta.0.20200926161115-31da13c84f9f h1:P22nFDZslbjnSgE60eICyN7cfTO/QXlyeALTMmXOuuc=
+github.com/jaredallard/ktunnel v1.2.8-beta.0.20200926161115-31da13c84f9f/go.mod h1:8tqZSClJ9vDe6gIx/XSrLPZ4PwZiW9X16Y2ujbm3NgA=
+github.com/jaredallard/ktunnel v1.2.8-beta.0.20200926161423-12ee824c0786 h1:3MKb2EvPoviSW9jtyGH1UdpLAvb+g/M2KCrsH3qRYJc=
+github.com/jaredallard/ktunnel v1.2.8-beta.0.20200926161423-12ee824c0786/go.mod h1:8tqZSClJ9vDe6gIx/XSrLPZ4PwZiW9X16Y2ujbm3NgA=
+github.com/jaredallard/ktunnel v1.2.8-beta.0.20200926161618-3698a12ca694 h1:F48BX7xXpcF30lOaVRxpRE5bNvi8dT9NpLjOqj+ECto=
+github.com/jaredallard/ktunnel v1.2.8-beta.0.20200926161618-3698a12ca694/go.mod h1:8tqZSClJ9vDe6gIx/XSrLPZ4PwZiW9X16Y2ujbm3NgA=
 github.com/jmoiron/sqlx v1.2.0 h1:41Ip0zITnmWNR/vHV+S4m+VoUivnWY5E4OJfLZjCJMA=
 github.com/jmoiron/sqlx v1.2.0/go.mod h1:1FEQNm3xlJgrMD+FBdI9+xvCksHtbpVBBw5dYhBSsks=
 github.com/jonboulle/clockwork v0.1.0/go.mod h1:Ii8DK3G1RaLaWxj9trq07+26W01tbo22gdxWY5EU2bo=

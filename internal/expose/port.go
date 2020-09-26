@@ -128,6 +128,13 @@ func (p *ServiceForward) createServerPodAndTransport(ctx context.Context) (clean
 		return func() {}, 0, errors.Wrap(err, "failed to create pod")
 	}
 
+	cleanupFn = func() {
+		p.c.log.Debug("cleaning up pod")
+		// cleanup the pod
+		//nolint:errcheck
+		p.c.k.CoreV1().Pods(p.Namespace).Delete(context.Background(), po.Name, metav1.DeleteOptions{})
+	}
+
 	p.c.log.Infof("created pod %s", po.ObjectMeta.Name)
 
 	p.c.log.Info("waiting for remote pod to be ready ...")
@@ -154,6 +161,7 @@ loop:
 				}
 			}
 		case <-ctx.Done():
+			cleanupFn()
 			return func() {}, 0, ctx.Err()
 		}
 	}
@@ -177,6 +185,7 @@ loop:
 	select {
 	case <-fw.Ready:
 	case <-ctx.Done():
+		cleanupFn()
 		return func() {}, 0, ctx.Err()
 	}
 
@@ -195,12 +204,7 @@ loop:
 		return func() {}, 0, fmt.Errorf("failed to determine the generated underlying transport port")
 	}
 
-	return func() {
-		p.c.log.Debug("cleaning up pod")
-		// cleanup the pod
-		//nolint:errcheck
-		p.c.k.CoreV1().Pods(p.Namespace).Delete(context.Background(), po.Name, metav1.DeleteOptions{})
-	}, port, nil
+	return cleanupFn, port, nil
 }
 
 // Start starts forwarding a service
@@ -208,7 +212,7 @@ func (p *ServiceForward) Start(ctx context.Context) error {
 	ports := make([]string, len(p.Ports))
 	for i, port := range p.Ports {
 		prt := int(port.TargetPort.IntVal)
-		ports[i] = fmt.Sprintf("%d:%d", prt, prt)
+		ports[i] = fmt.Sprintf("%d:%d", port.MappedPort, prt)
 	}
 
 	cleanupFn, localPort, err := p.createServerPodAndTransport(ctx)
@@ -216,10 +220,6 @@ func (p *ServiceForward) Start(ctx context.Context) error {
 		return errors.Wrap(err, "failed to create server and/or transport")
 	}
 	defer cleanupFn()
-
-	// TODO(jaredallard): We likely need reconnect logic here
-	host := "127.0.0.1"
-	tls := false
 
 	// scale down the other resources that powered this service
 	for _, o := range p.objects {
@@ -239,7 +239,12 @@ func (p *ServiceForward) Start(ctx context.Context) error {
 	}()
 
 	p.c.log.Debug("creating ktunnel client")
-	err = client.RunClient(ctx, &host, &localPort, "tcp", &tls, nil, nil, ports)
+	err = client.RunClient(
+		ctx,
+		client.WithServer("127.0.0.1", localPort),
+		client.WithTunnels("tcp", ports...),
+		client.WithLogger(p.c.log),
+	)
 	if err != nil {
 		return errors.Wrap(err, "failed to create grpc transport")
 	}

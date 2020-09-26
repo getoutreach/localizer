@@ -91,6 +91,10 @@ type ResolvedServicePort struct {
 	// OriginalTargetPort is set if the ServicePort
 	// was modified
 	OriginalTargetPort string
+
+	// MappedPort is the locally mapped port that this should have
+	// defaults to the targetPort
+	MappedPort uint
 }
 
 // ResolveServicePorts converts named ports into their true
@@ -105,6 +109,7 @@ func ResolveServicePorts(ctx context.Context, k kubernetes.Interface,
 			servicePorts[i] = ResolvedServicePort{
 				sp,
 				"",
+				uint(sp.Port),
 			}
 		}
 		return servicePorts, false, nil
@@ -136,6 +141,7 @@ func ResolveServicePorts(ctx context.Context, k kubernetes.Interface,
 		servicePorts[i] = ResolvedServicePort{
 			p,
 			original,
+			uint(p.TargetPort.IntVal),
 		}
 	}
 

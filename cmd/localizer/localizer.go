@@ -24,7 +24,6 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/jaredallard/localizer/internal/expose"
 	"github.com/jaredallard/localizer/internal/kube"
 	"github.com/jaredallard/localizer/internal/proxier"
@@ -102,9 +101,7 @@ func main() { //nolint:funlen,gocyclo
 
 					// note: port 50 is chosen as least likely to collide with anything
 					// we may want to look into randomizing it in the future
-					port := 50
-					tls := false
-					return errors.Wrap(server.RunServer(ctx, &port, &tls, nil, nil), "server failed")
+					return errors.Wrap(server.RunServer(ctx, server.WithPort(50), server.WithLogger(log)), "server failed")
 				},
 			},
 			{
@@ -113,11 +110,8 @@ func main() { //nolint:funlen,gocyclo
 				Usage:       "expose <service>",
 				Flags: []cli.Flag{
 					&cli.StringSliceFlag{
-						// Note: We should make this true override support
-						// right now this will only work for a targetPort -> another targetPort
-						// and not the noted localPort
 						Name:  "map",
-						Usage: "Map a service's target port to another port, --map targetPortName:remotePort",
+						Usage: "Map a local port to a remote port, i.e --map 80:8080 will bind what is normally :8080 to :80 locally",
 					},
 				},
 				Action: func(c *cli.Context) error {
@@ -146,58 +140,39 @@ func main() { //nolint:funlen,gocyclo
 						return errors.Wrap(err, "failed to resolve service ports")
 					}
 
-					portOverrides := make(map[string]uint)
+					log.Debugf("map %v", c.StringSlice("map"))
 					for _, portOverride := range c.StringSlice("map") {
 						spl := strings.Split(portOverride, ":")
 						if len(spl) != 2 {
 							return fmt.Errorf("invalid port map '%s', expected 'local:remote'", portOverride)
 						}
 
-						local := spl[0]
-						rem := spl[1]
-
-						remote, err := strconv.ParseUint(rem, 10, 0)
+						local, err := strconv.ParseUint(spl[0], 10, 0)
 						if err != nil {
 							return errors.Wrapf(err, "failed to parse port map '%s'", portOverride)
 						}
 
-						portOverrides[local] = uint(remote)
+						rem, err := strconv.ParseUint(spl[1], 10, 0)
+						if err != nil {
+							return errors.Wrapf(err, "failed to parse port map '%s'", portOverride)
+						}
+
+						// TODO: this is slow...
+						for i, sp := range servicePorts {
+							log.Debugf("checking if we need to map %v, using %d:%d", sp.TargetPort, rem, local)
+							if uint(servicePorts[i].TargetPort.IntVal) == uint(rem) {
+								servicePorts[i].MappedPort = uint(local)
+							}
+						}
 					}
 
-					// if we couldn't find endpoints, check if we mapped the port, if not
-					// then prompt the user
+					// if we couldn't find endpoints, then we fall back to binding whatever the
+					// public port of the service is
 					if !exists {
-						log.Info("Failed to resolve ports due to endpoints not exists, please use --map or awnser the below prompt(s)")
-						for _, sp := range servicePorts {
-							if sp.TargetPort.Type != intstr.String {
-								continue
-							}
-
-							v, err := getUserInput(fmt.Sprintf("Please enter a port to map '%s' to: ", sp.TargetPort.StrVal))
-							if err != nil {
-								return errors.Wrap(err, "failed to get user input")
-							}
-
-							remote, err := strconv.ParseUint(v, 10, 0)
-							if err != nil {
-								return errors.Wrapf(err, "failed to parse port map '%s'", v)
-							}
-
-							portOverrides[strconv.Itoa(int(sp.Port))] = uint(remote)
+						for i, sp := range servicePorts {
+							servicePorts[i].TargetPort = intstr.FromInt(int(sp.Port))
 						}
 					}
-
-					mappedServicePorts := make([]kube.ResolvedServicePort, len(servicePorts))
-					for i, sp := range servicePorts {
-						mappedPort, ok := portOverrides[strconv.Itoa(int(sp.Port))]
-						if ok {
-							sp.Port = int32(mappedPort)
-							sp.TargetPort = intstr.FromInt(int(mappedPort))
-						}
-						mappedServicePorts[i] = sp
-					}
-
-					log.WithField("portoverride", "").Debug(spew.Sdump(portOverrides))
 
 					// if there's no endpoints
 					if !exists {
@@ -209,7 +184,7 @@ func main() { //nolint:funlen,gocyclo
 						return err
 					}
 
-					p, err := e.Expose(ctx, mappedServicePorts, serviceSplit[0], serviceSplit[1])
+					p, err := e.Expose(ctx, servicePorts, serviceSplit[0], serviceSplit[1])
 					if err != nil {
 						return errors.Wrap(err, "failed to create reverse tunnel")
 					}
