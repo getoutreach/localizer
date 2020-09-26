@@ -3,7 +3,7 @@ GO             ?= go
 SHELL          := /usr/bin/env bash
 GOOS           := $(shell go env GOOS)
 GOARCH         := $(shell go env GOARCH)
-PKG            := $(GO) mod download
+PKG            := $(GO) mod download -x
 # TODO(jaredallard): infer from Git tag
 APP_VERSION    := $(shell git describe --match 'v[0-9]*' --tags --abbrev=0 --always HEAD)
 LDFLAGS        := -w -s
@@ -12,7 +12,6 @@ GOPROXY        := https://proxy.golang.org
 GO_EXTRA_FLAGS := -v
 TAGS           :=
 BINDIR         := $(CURDIR)/bin
-BIN_NAME       := bootstraper
 PKGDIR         := github.com/jaredallard/localizer
 CGO_ENABLED    := 1
 BENCH_FLAGS    := "-bench=Bench $(BENCH_FLAGS)"
@@ -61,9 +60,9 @@ gobuild:
 	mkdir -p $(BINDIR)
 	GOPROXY=$(GOPROXY) CGO_ENABLED=$(CGO_ENABLED) $(GO) build -o $(BINDIR)/ -ldflags "$(LDFLAGS)" $(GO_EXTRA_FLAGS) $(PKGDIR)/...
 
-.PHONY: docker-build-push
-docker-build-push:
-	@$(LOG) info "Building and push docker image"
+.PHONY: docker-build
+docker-build:
+	@$(LOG) info "Building docker image"
 	DOCKER_BUILDKIT=1 docker build -t "jaredallard/localizer:latest" .
 
 .PHONY: fmt
