@@ -23,7 +23,7 @@ import (
 	"github.com/davecgh/go-spew/spew"
 	"github.com/jaredallard/localizer/internal/kube"
 	"github.com/jaredallard/localizer/internal/proxier"
-	"github.com/omrikiei/ktunnel/pkg/client"
+	"github.com/jaredallard/localizer/internal/ssh"
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -58,7 +58,7 @@ func (s *scaledObjectType) GetKey() string {
 }
 
 func (p *ServiceForward) createServerPortForward(ctx context.Context, po *corev1.Pod) (*portforward.PortForwarder, error) {
-	return kube.CreatePortForward(ctx, p.c.k.CoreV1().RESTClient(), p.c.kconf, po, "0.0.0.0", []string{"0:50"})
+	return kube.CreatePortForward(ctx, p.c.k.CoreV1().RESTClient(), p.c.kconf, po, "0.0.0.0", []string{"0:2222"})
 }
 
 func (p *ServiceForward) createServerPodAndTransport(ctx context.Context) (cleanupFn func(), port int, err error) { //nolint:funlen,gocyclo
@@ -97,13 +97,31 @@ func (p *ServiceForward) createServerPodAndTransport(ctx context.Context) (clean
 			Containers: []corev1.Container{
 				{
 					Name:            "default",
-					Image:           "jaredallard/localizer:" + localizerVersion,
+					Image:           "linuxserver/openssh-server",
 					ImagePullPolicy: corev1.PullIfNotPresent,
 					Ports:           containerPorts,
+					Env: []corev1.EnvVar{
+						{
+							Name:  "PASSWORD_ACCESS",
+							Value: "true",
+						},
+						{
+							Name:  "USER_PASSWORD",
+							Value: "supersecretpassword",
+						},
+						{
+							Name:  "USER_NAME",
+							Value: "outreach",
+						},
+						{
+							Name:  "DOCKER_MODS",
+							Value: "linuxserver/mods:openssh-server-ssh-tunnel",
+						},
+					},
 					ReadinessProbe: &corev1.Probe{
 						Handler: corev1.Handler{
-							HTTPGet: &corev1.HTTPGetAction{
-								Port: intstr.FromInt(51),
+							TCPSocket: &corev1.TCPSocketAction{
+								Port: intstr.FromInt(2222),
 							},
 						},
 					},
@@ -170,6 +188,7 @@ loop:
 
 	fw, err := p.createServerPortForward(ctx, po)
 	if err != nil {
+		cleanupFn()
 		return func() {}, 0, errors.Wrap(err, "failed to create tunnel for underlying transport")
 	}
 
@@ -191,16 +210,18 @@ loop:
 
 	ports, err := fw.GetPorts()
 	if err != nil {
+		cleanupFn()
 		return func() {}, 0, errors.Wrap(err, "failed to get generated underlying transport port")
 	}
 
 	for _, p := range ports {
-		if p.Remote == 50 {
+		if p.Remote == 2222 {
 			port = int(p.Local)
 		}
 	}
 
 	if port == 0 {
+		cleanupFn()
 		return func() {}, 0, fmt.Errorf("failed to determine the generated underlying transport port")
 	}
 
@@ -238,15 +259,11 @@ func (p *ServiceForward) Start(ctx context.Context) error {
 		}
 	}()
 
-	p.c.log.Debug("creating ktunnel client")
-	err = client.RunClient(
-		ctx,
-		client.WithServer("127.0.0.1", localPort),
-		client.WithTunnels("tcp", ports...),
-		client.WithLogger(p.c.log),
-	)
+	p.c.log.Debug("creating tunnel client")
+	cli := ssh.NewReverseTunnelClient(p.c.log, "127.0.0.1", localPort, ports)
+	err = cli.Start(ctx)
 	if err != nil {
-		return errors.Wrap(err, "failed to create grpc transport")
+		return errors.Wrap(err, "tunnel client failed")
 	}
 
 	// wait for the context to finish

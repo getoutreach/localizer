@@ -15,5 +15,9 @@ bin/
 # Dependency directories (remove the comment below to include it)
 vendor/
 
+# Ignore our replacements directory for allowing testing of
+# forked go modules
+replacements/
+
 # Build stuff
 dist/

@@ -16,7 +16,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"net/http"
 	"os"
 	"os/signal"
 	"os/user"
@@ -27,7 +26,6 @@ import (
 	"github.com/jaredallard/localizer/internal/expose"
 	"github.com/jaredallard/localizer/internal/kube"
 	"github.com/jaredallard/localizer/internal/proxier"
-	"github.com/omrikiei/ktunnel/pkg/server"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
@@ -69,28 +67,14 @@ func main() { //nolint:funlen,gocyclo
 				EnvVars:     []string{"LOG_LEVEL"},
 				DefaultText: "INFO",
 			},
+			&cli.StringFlag{
+				Name:        "log-format",
+				Usage:       "Set the log format",
+				EnvVars:     []string{"LOG_FORMAT"},
+				DefaultText: "TEXT",
+			},
 		},
 		Commands: []*cli.Command{
-			{
-				Name:        "server",
-				Description: "Run a server that can be used with `expose`",
-				Usage:       "server",
-				Action: func(c *cli.Context) error {
-					go func() {
-						if err := http.ListenAndServe(":51",
-							http.HandlerFunc(
-								func(w http.ResponseWriter, r *http.Request) { fmt.Fprintln(w, "ready") },
-							),
-						); err != nil {
-							log.WithError(err).Fatal("failed to start readiness prob server")
-						}
-					}()
-
-					// note: port 50 is chosen as least likely to collide with anything
-					// we may want to look into randomizing it in the future
-					return errors.Wrap(server.RunServer(ctx, server.WithPort(50), server.WithLogger(log)), "server failed")
-				},
-			},
 			{
 				Name:        "expose",
 				Description: "Expose ports for a given service to Kubernetes",
@@ -200,6 +184,11 @@ func main() { //nolint:funlen,gocyclo
 			if strings.EqualFold(c.String("log-level"), "debug") {
 				log.SetLevel(logrus.DebugLevel)
 				log.Debug("set logger to debug")
+			}
+
+			if strings.EqualFold(c.String("log-format"), "JSON") {
+				log.SetFormatter(&logrus.JSONFormatter{})
+				log.Debug("set log format to JSON")
 			}
 
 			kconf, k, err = kube.GetKubeClient(c.String("context"))
