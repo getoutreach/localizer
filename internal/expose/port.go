@@ -32,8 +32,6 @@ import (
 	"k8s.io/client-go/tools/portforward"
 )
 
-const localizerVersion = "latest"
-
 type ServiceForward struct {
 	c *Client
 
