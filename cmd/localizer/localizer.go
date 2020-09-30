@@ -111,6 +111,19 @@ func main() { //nolint:funlen,gocyclo
 						return errors.Wrap(err, "failed to resolve service ports")
 					}
 
+					// if we couldn't find endpoints, then we fall back to binding whatever the
+					// public port of the service is if it is named
+					if !exists {
+						for i, sp := range servicePorts {
+							if servicePorts[i].TargetPort.Type == intstr.String {
+								log.Warnf("failed to determine the value of port %s, using public port %d", sp.TargetPort.String(), sp.Port)
+								servicePorts[i].TargetPort = intstr.FromInt(int(sp.Port))
+							}
+						}
+
+						log.Debug("service has no endpoints")
+					}
+
 					log.Debugf("map %v", c.StringSlice("map"))
 					for _, portOverride := range c.StringSlice("map") {
 						spl := strings.Split(portOverride, ":")
@@ -130,24 +143,12 @@ func main() { //nolint:funlen,gocyclo
 
 						// TODO: this is slow...
 						for i, sp := range servicePorts {
-							log.Debugf("checking if we need to map %v, using %d:%d", sp.TargetPort, rem, local)
-							if uint(servicePorts[i].TargetPort.IntVal) == uint(rem) {
+							log.Debugf("checking if we need to map %s, using %d:%d", sp.TargetPort.String(), rem, local)
+							if uint(servicePorts[i].TargetPort.IntValue()) == uint(rem) {
+								log.Debugf("mapping remote port %d -> %d locally", rem, local)
 								servicePorts[i].MappedPort = uint(local)
 							}
 						}
-					}
-
-					// if we couldn't find endpoints, then we fall back to binding whatever the
-					// public port of the service is
-					if !exists {
-						for i, sp := range servicePorts {
-							servicePorts[i].TargetPort = intstr.FromInt(int(sp.Port))
-						}
-					}
-
-					// if there's no endpoints
-					if !exists {
-						log.Debug("service has no endpoints")
 					}
 
 					e := expose.NewExposer(k, kconf, log)

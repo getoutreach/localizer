@@ -59,7 +59,7 @@ func NewReverseTunnelClient(l logrus.FieldLogger, host string, port int, ports [
 				panic(err)
 			}
 
-			rport, err := strconv.Atoi(ports[0])
+			rport, err := strconv.Atoi(ports[1])
 			if err != nil {
 				panic(err)
 			}
@@ -114,7 +114,7 @@ func (c *Client) Start(ctx context.Context) error {
 			defer listener.Close()
 			defer wg.Done()
 
-			c.log.Infof("starting tunnel to %d", remotePort)
+			c.log.Infof("created tunnel from remote %d to %s", remotePort, localAddr)
 
 			// handle incoming connections on reverse forwarded tunnel
 			for {

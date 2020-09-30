@@ -141,7 +141,7 @@ func ResolveServicePorts(ctx context.Context, k kubernetes.Interface,
 		servicePorts[i] = ResolvedServicePort{
 			p,
 			original,
-			uint(p.TargetPort.IntVal),
+			uint(p.TargetPort.IntValue()),
 		}
 	}
 

@@ -232,6 +232,7 @@ func (p *ServiceForward) Start(ctx context.Context) error {
 	for i, port := range p.Ports {
 		prt := int(port.TargetPort.IntVal)
 		ports[i] = fmt.Sprintf("%d:%d", port.MappedPort, prt)
+		p.c.log.Debugf("tunneling port %v", ports[i])
 	}
 
 	cleanupFn, localPort, err := p.createServerPodAndTransport(ctx)
