@@ -32,6 +32,24 @@ import (
 	"k8s.io/client-go/tools/portforward"
 )
 
+var (
+	// ErrUnderlyingTransportDied is triggered when the kubernetes port-forward loses
+	// connection. This results in the transport protocol dying as well.
+	ErrUnderlyingTransportDied = errors.New("underlying transport died")
+
+	// ErrUnderlyingTransportProtocolDied is triggered when the ssh tunnel loses connection,
+	// this can be due to the ssh connection being destroyed or the port-forward being killed
+	ErrUnderlyingTransportProtocolDied = errors.New("underlying transport protocol (ssh) died")
+
+	// ErrNotInitialized is used to start the initialization
+	// process. It is not an error, despite its name.
+	ErrNotInitialized = errors.New("not initialized")
+
+	// ErrUnderlyingTransportPodDestroyed is triggered only when a pod is destroyed,
+	// note that this will usually case ErrUnderlyingTransportDied to be triggered.
+	ErrUnderlyingTransportPodDestroyed = errors.New("underlying transport pod died")
+)
+
 type ServiceForward struct {
 	c *Client
 
@@ -56,11 +74,11 @@ func (s *scaledObjectType) GetKey() string {
 	return strings.ToLower(fmt.Sprintf("%s/%s/%s", s.Kind, s.Namespace, s.Name))
 }
 
-func (p *ServiceForward) createServerPortForward(ctx context.Context, po *corev1.Pod) (*portforward.PortForwarder, error) {
-	return kube.CreatePortForward(ctx, p.c.k.CoreV1().RESTClient(), p.c.kconf, po, "0.0.0.0", []string{"0:2222"})
+func (p *ServiceForward) createServerPortForward(ctx context.Context, po *corev1.Pod, localPort int) (*portforward.PortForwarder, error) {
+	return kube.CreatePortForward(ctx, p.c.k.CoreV1().RESTClient(), p.c.kconf, po, "0.0.0.0", []string{fmt.Sprintf("%d:2222", localPort)})
 }
 
-func (p *ServiceForward) createServerPodAndTransport(ctx context.Context) (cleanupFn func(), port int, err error) { //nolint:funlen,gocyclo
+func (p *ServiceForward) createServerPod(ctx context.Context) (func(), *corev1.Pod, error) { //nolint:funlen,gocyclo
 	// map the service ports into containerPorts, using the
 	containerPorts := make([]corev1.ContainerPort, len(p.Ports))
 	for i, port := range p.Ports {
@@ -78,13 +96,13 @@ func (p *ServiceForward) createServerPodAndTransport(ctx context.Context) (clean
 	// create a pod for our new expose service
 	exposedPortsJSON, err := json.Marshal(containerPorts)
 	if err != nil {
-		return func() {}, 0, err
+		return func() {}, nil, err
 	}
 
 	podObject := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace:    p.Namespace,
-			GenerateName: fmt.Sprintf("localizer-%s", p.ServiceName),
+			GenerateName: fmt.Sprintf("localizer-%s-", p.ServiceName),
 			Annotations: map[string]string{
 				proxier.ExposedAnnotation:          "true",
 				proxier.ExposedLocalPortAnnotation: string(exposedPortsJSON),
@@ -142,10 +160,10 @@ func (p *ServiceForward) createServerPodAndTransport(ctx context.Context) (clean
 
 	po, err := p.c.k.CoreV1().Pods(p.Namespace).Create(ctx, podObject, metav1.CreateOptions{})
 	if err != nil {
-		return func() {}, 0, errors.Wrap(err, "failed to create pod")
+		return func() {}, nil, errors.Wrap(err, "failed to create pod")
 	}
 
-	cleanupFn = func() {
+	cleanupFn := func() {
 		p.c.log.Debug("cleaning up pod")
 		// cleanup the pod
 		//nolint:errcheck
@@ -155,9 +173,8 @@ func (p *ServiceForward) createServerPodAndTransport(ctx context.Context) (clean
 	p.c.log.Infof("created pod %s", po.ObjectMeta.Name)
 
 	p.c.log.Info("waiting for remote pod to be ready ...")
-	t := time.NewTicker(10 * time.Second)
+	t := time.NewTicker(3 * time.Second)
 
-loop:
 	for {
 		select {
 		case <-t.C:
@@ -173,58 +190,54 @@ loop:
 			for _, cond := range po.Status.Conditions {
 				if cond.Type == corev1.PodReady {
 					if cond.Status == corev1.ConditionTrue {
-						break loop
+						return cleanupFn, po, nil
 					}
 				}
 			}
 		case <-ctx.Done():
 			cleanupFn()
-			return func() {}, 0, ctx.Err()
+			return func() {}, nil, ctx.Err()
 		}
 	}
+}
 
-	p.c.log.Info("pod is ready, creating tunnel")
-
-	fw, err := p.createServerPortForward(ctx, po)
+func (p *ServiceForward) createTransport(ctx context.Context, po *corev1.Pod, localPort int) (int, *portforward.PortForwarder, error) {
+	fw, err := p.createServerPortForward(ctx, po, localPort)
 	if err != nil {
-		cleanupFn()
-		return func() {}, 0, errors.Wrap(err, "failed to create tunnel for underlying transport")
+		return 0, nil, errors.Wrap(err, "failed to create tunnel for underlying transport")
 	}
 
 	fw.Ready = make(chan struct{})
-	go func() {
-		// TODO(jaredallard): reconnect logic that works with context
-		if err := fw.ForwardPorts(); err != nil {
-			p.c.log.WithError(err).Error("underlying transport died")
-		}
-	}()
+
+	go fw.ForwardPorts()
 
 	p.c.log.Debug("waiting for transport to be marked as ready")
 	select {
 	case <-fw.Ready:
+	case <-time.After(time.Second * 10):
+		return 0, nil, fmt.Errorf("deadline exceeded")
 	case <-ctx.Done():
-		cleanupFn()
-		return func() {}, 0, ctx.Err()
+		return 0, nil, ctx.Err()
 	}
 
-	ports, err := fw.GetPorts()
-	if err != nil {
-		cleanupFn()
-		return func() {}, 0, errors.Wrap(err, "failed to get generated underlying transport port")
-	}
+	// only find the port if we don't already know it
+	if localPort == 0 {
+		fwPorts, err := fw.GetPorts()
+		if err != nil {
+			return 0, nil, errors.Wrap(err, "failed to get generated underlying transport port")
+		}
 
-	for _, p := range ports {
-		if p.Remote == 2222 {
-			port = int(p.Local)
+		for _, p := range fwPorts {
+			if p.Remote == 2222 {
+				localPort = int(p.Local)
+			}
+		}
+		if localPort == 0 {
+			return 0, nil, fmt.Errorf("failed to determine the generated underlying transport port")
 		}
 	}
 
-	if port == 0 {
-		cleanupFn()
-		return func() {}, 0, fmt.Errorf("failed to determine the generated underlying transport port")
-	}
-
-	return cleanupFn, port, nil
+	return localPort, fw, nil
 }
 
 // Start starts forwarding a service
@@ -235,12 +248,6 @@ func (p *ServiceForward) Start(ctx context.Context) error {
 		ports[i] = fmt.Sprintf("%d:%d", port.MappedPort, prt)
 		p.c.log.Debugf("tunneling port %v", ports[i])
 	}
-
-	cleanupFn, localPort, err := p.createServerPodAndTransport(ctx)
-	if err != nil {
-		return errors.Wrap(err, "failed to create server and/or transport")
-	}
-	defer cleanupFn()
 
 	// scale down the other resources that powered this service
 	for _, o := range p.objects {
@@ -259,15 +266,80 @@ func (p *ServiceForward) Start(ctx context.Context) error {
 		}
 	}()
 
-	p.c.log.Debug("creating tunnel client")
-	cli := ssh.NewReverseTunnelClient(p.c.log, "127.0.0.1", localPort, ports)
-	err = cli.Start(ctx)
-	if err != nil {
-		return errors.Wrap(err, "tunnel client failed")
-	}
+	// TODO(jaredallard): handle pod being destroyed
+	lastErr := ErrNotInitialized
+	localPort := 0
+	cleanupFn := func() {}
+
+	var po *corev1.Pod
+	var fw *portforward.PortForwarder
+	go func() {
+		for {
+			var err error
+			select {
+			case <-ctx.Done():
+				return
+			default:
+				if lastErr == ErrNotInitialized {
+					p.c.log.Debug("creating tunnel connection")
+				} else {
+					p.c.log.WithError(err).Errorf("connection died, recreating tunnel connection")
+				}
+
+				if lastErr != ErrNotInitialized {
+					// we can't really do exponential backoff right now, so do a set time
+					select {
+					case <-ctx.Done():
+						return
+					case <-time.After(time.Second * 5):
+					}
+				} else {
+					// reset our err at this point, if we were not initialized
+					lastErr = nil
+				}
+
+				// clean up the old pod, if it exists
+				cleanupFn()
+
+				cleanupFn, po, err = p.createServerPod(ctx)
+				if err != nil {
+					p.c.log.WithError(err).Debug("failed to create pod")
+					lastErr = ErrUnderlyingTransportPodDestroyed
+					continue
+				}
+
+				localPort, fw, err = p.createTransport(ctx, po, 0)
+				if err != nil {
+					if fw != nil {
+						fw.Close()
+					}
+
+					p.c.log.WithError(err).Debug("failed to recreate transport port-forward")
+					lastErr = ErrUnderlyingTransportDied
+					continue
+				}
+
+				cli := ssh.NewReverseTunnelClient(p.c.log, "127.0.0.1", localPort, ports)
+				err = cli.Start(ctx)
+				if err != nil {
+					p.c.log.WithError(err).Debug("failed to recreate transport")
+					lastErr = ErrUnderlyingTransportProtocolDied
+				} else {
+					p.c.log.WithError(err).Debug("transport died")
+					lastErr = ErrUnderlyingTransportDied
+				}
+
+				// cleanup the port-forward if the above died
+				if fw != nil {
+					fw.Close()
+				}
+			}
+		}
+	}()
 
 	// wait for the context to finish
 	<-ctx.Done()
 
+	cleanupFn()
 	return nil
 }
