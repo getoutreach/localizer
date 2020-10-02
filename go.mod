@@ -9,6 +9,7 @@ require (
 	github.com/elazarl/goproxy v0.0.0-20191011121108-aa519ddbe484 // indirect
 	github.com/elazarl/goproxy/ext v0.0.0-20191011121108-aa519ddbe484 // indirect
 	github.com/function61/gokit v0.0.0-20200923114939-f8d7e065a5c3
+	github.com/go-logr/logr v0.2.0
 	github.com/imdario/mergo v0.3.8 // indirect
 	github.com/metal-stack/go-ipam v1.6.0
 	github.com/pkg/errors v0.9.1
@@ -21,6 +22,7 @@ require (
 	k8s.io/api v0.19.2
 	k8s.io/apimachinery v0.19.2
 	k8s.io/client-go v0.19.2
+	k8s.io/klog/v2 v2.2.0
 	k8s.io/kubectl v0.19.2
 )
 

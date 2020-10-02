@@ -18,7 +18,6 @@ import (
 	"fmt"
 	"os/exec"
 	"runtime"
-	"time"
 
 	"github.com/jaredallard/localizer/internal/kube"
 	"github.com/metal-stack/go-ipam"
@@ -82,7 +81,6 @@ func (pc *ProxyConnection) Start(ctx context.Context) error {
 		return errors.Wrap(err, "failed to save address to hosts")
 	}
 
-	fw.Ready = make(chan struct{})
 	go func() {
 		if err := fw.ForwardPorts(); err != nil {
 			// if this dies, mark the connection as inactive for
@@ -100,15 +98,6 @@ func (pc *ProxyConnection) Start(ctx context.Context) error {
 			pc.proxier.handleInformerEvent(ctx, "connection-dead", pc)
 		}
 	}()
-
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	case <-fw.Ready:
-	case <-time.After(time.Second * 10):
-		// if it's been 5 seconds and it's not ready, then we can safely return an error
-		return fmt.Errorf("deadline exceeded")
-	}
 
 	return nil
 }
