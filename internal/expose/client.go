@@ -315,10 +315,11 @@ func (c *Client) Expose(ctx context.Context, ports []kube.ResolvedServicePort, n
 	}
 
 	return &ServiceForward{
-		c:         c,
-		Namespace: namespace,
-		Selector:  s.Spec.Selector,
-		Ports:     ports,
-		objects:   objects,
+		c:           c,
+		ServiceName: serviceName,
+		Namespace:   namespace,
+		Selector:    s.Spec.Selector,
+		Ports:       ports,
+		objects:     objects,
 	}, nil
 }

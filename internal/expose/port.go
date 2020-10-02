@@ -35,9 +35,10 @@ import (
 type ServiceForward struct {
 	c *Client
 
-	Namespace string
-	Selector  map[string]string
-	Ports     []kube.ResolvedServicePort
+	ServiceName string
+	Namespace   string
+	Selector    map[string]string
+	Ports       []kube.ResolvedServicePort
 
 	// TODO(jaredallard): support replacing non associated pods?
 	objects map[string]scaledObjectType
@@ -83,7 +84,7 @@ func (p *ServiceForward) createServerPodAndTransport(ctx context.Context) (clean
 	podObject := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace:    p.Namespace,
-			GenerateName: "localizer-",
+			GenerateName: fmt.Sprintf("localizer-%s", p.ServiceName),
 			Annotations: map[string]string{
 				proxier.ExposedAnnotation:          "true",
 				proxier.ExposedLocalPortAnnotation: string(exposedPortsJSON),
