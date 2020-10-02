@@ -82,7 +82,6 @@ func (pc *ProxyConnection) Start(ctx context.Context) error {
 	}
 
 	go func() {
-		// TODO(jaredallard): Figure out a way to better backoff errors here
 		if err := fw.ForwardPorts(); err != nil {
 			// if this dies, mark the connection as inactive for
 			// the connection reaper

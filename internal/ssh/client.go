@@ -3,6 +3,7 @@ package ssh
 import (
 	"context"
 	"fmt"
+	"io"
 	"net"
 	"strings"
 	"sync"
@@ -73,6 +74,8 @@ func NewReverseTunnelClient(l logrus.FieldLogger, host string, port int, ports [
 	return &Client{l, host, port, portMap}
 }
 
+// Start starts the ssh tunnel. This blocks until
+// all listeners have closed
 func (c *Client) Start(ctx context.Context) error {
 	dialer := net.Dialer{
 		Timeout: 10 * time.Second,
@@ -83,6 +86,7 @@ func (c *Client) Start(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	defer conn.Close()
 
 	sconn, chans, reqs, err := ssh.NewClientConn(conn, addr, &ssh.ClientConfig{
 		User: "outreach",
@@ -125,7 +129,11 @@ func (c *Client) Start(ctx context.Context) error {
 				}
 				client, err := listener.Accept()
 				if err != nil {
-					c.log.WithError(err).Errorf("failed to accept traffic on remote listener")
+					if err != io.EOF {
+						c.log.WithError(err).Errorf("failed to accept traffic on remote listener")
+					} else {
+						c.log.Warnf("remote listener closed the connection")
+					}
 					return
 				}
 
@@ -136,7 +144,6 @@ func (c *Client) Start(ctx context.Context) error {
 		}(remotePort)
 	}
 
-	<-ctx.Done()
 	wg.Wait()
 
 	return nil
@@ -160,6 +167,6 @@ func (c *Client) handleReverseForwardConn(client net.Conn, localAddr string) {
 	// - the "client" and "remote" strings we give Pipe() is just for error&log messages
 	// - this blocks until either of the parties' socket closes (or breaks)
 	if err := bidipipe.Pipe(bidipipe.WithName("client", client), bidipipe.WithName("remote", remote)); err != nil {
-		c.log.WithError(err).Errorf("tunnel failed")
+		c.log.WithError(err).Warnf("failed to send data over tunnel")
 	}
 }
