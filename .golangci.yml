@@ -24,7 +24,7 @@ linters-settings:
       - wrapperFunc
       - commentFormatting # Breaks bootstraper
   gocyclo:
-    min-complexity: 15
+    min-complexity: 20
   goimports:
     local-prefixes: github.com/tritonmedia/api
   golint:
