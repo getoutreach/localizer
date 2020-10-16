@@ -145,14 +145,6 @@ func main() { //nolint:funlen,gocyclo
 				Usage:   "Specify Kubernetes context to use",
 				EnvVars: []string{"KUBECONTEXT"},
 			},
-			&cli.StringSliceFlag{
-				Name:  "skip-app",
-				Usage: "Skip forwarding an application locally",
-			},
-			&cli.StringSliceFlag{
-				Name:  "skip-namespace",
-				Usage: "Skip forwarding to a namespace",
-			},
 			&cli.StringFlag{
 				Name:        "log-level",
 				Usage:       "Set the log level",
@@ -297,51 +289,14 @@ func main() { //nolint:funlen,gocyclo
 			return nil
 		},
 		Action: func(c *cli.Context) error {
-			d := proxier.NewDiscoverer(k, log)
-			p := proxier.NewProxier(k, kconf, log)
+			p := proxier.NewProxier(ctx, k, kconf, log)
 
 			log.Debug("waiting for caches to sync")
 			if err := p.Start(ctx); err != nil {
 				return errors.Wrap(err, "failed to start proxy informers")
 			}
 
-			services, err := d.Discover(ctx)
-			if err != nil {
-				return errors.Wrap(err, "failed to discover services")
-			}
-
-			nameFilterHM := make(map[string]bool)
-			for _, serv := range append(c.StringSlice("skip-app"), "kubernetes") {
-				nameFilterHM[serv] = true
-			}
-			namespaceFilterHM := make(map[string]bool)
-			for _, serv := range append(c.StringSlice("skip-namespace"), "kube-system") {
-				namespaceFilterHM[serv] = true
-			}
-
-			filteredServices := make([]proxier.Service, 0)
-			for _, serv := range services {
-				if nameFilterHM[serv.Name] {
-					continue
-				}
-
-				if namespaceFilterHM[serv.Namespace] {
-					continue
-				}
-
-				filteredServices = append(filteredServices, serv)
-			}
-
-			if len(filteredServices) == 0 {
-				log.Info("found no services, exiting ...")
-				return nil
-			}
-
-			if err := p.Add(filteredServices...); err != nil {
-				return errors.Wrap(err, "failed to add discovered services to proxy")
-			}
-
-			return errors.Wrap(p.Proxy(ctx), "failed to start proxier")
+			return errors.Wrap(p.Wait(), "failed to start proxier")
 		},
 	}
 

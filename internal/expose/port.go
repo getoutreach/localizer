@@ -321,7 +321,7 @@ func (p *ServiceForward) Start(ctx context.Context) error {
 				}
 
 				cli := ssh.NewReverseTunnelClient(p.c.log, "127.0.0.1", localPort, ports)
-				err = cli.Start(ctx)
+				err = cli.Start(ctx, p.ServiceName)
 				if err != nil {
 					p.c.log.WithError(err).Debug("failed to recreate transport")
 					lastErr = ErrUnderlyingTransportProtocolDied

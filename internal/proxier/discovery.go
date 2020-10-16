@@ -19,11 +19,8 @@ import (
 	"strconv"
 
 	"github.com/jaredallard/localizer/internal/kube"
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
-	kerrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 )
 
@@ -54,106 +51,74 @@ type ServicePort struct {
 	LocalPort  uint
 }
 
-type Discoverer struct {
-	k   kubernetes.Interface
-	log logrus.FieldLogger
-}
-
-// NewClient creates a new discovery client that is
-// capable of finding remote services and creating proxies
-func NewDiscoverer(k kubernetes.Interface, l logrus.FieldLogger) *Discoverer {
-	return &Discoverer{
-		k,
-		l,
+// CreateServiceFromKubernetesService creates a Service object from a Kubernetes corev1.Service
+func CreateServiceFromKubernetesService(ctx context.Context, olog logrus.FieldLogger,
+	k kubernetes.Interface, kserv *corev1.Service) (Service, error) { //nolint:funlen,gocyclo
+	serv := Service{
+		Name:      kserv.Name,
+		Namespace: kserv.Namespace,
+		Ports:     make([]*ServicePort, 0),
 	}
-}
+	key := serv.GetKey()
+	log := olog.WithField("service", key)
 
-// Discover finds services in a Kubernetes cluster and returns ones that
-// should be forwarded locally.
-func (d *Discoverer) Discover(ctx context.Context) ([]Service, error) { //nolint:funlen,gocyclo
-	cont := ""
-
-	s := make([]Service, 0)
-	for {
-		l, err := d.k.CoreV1().Services("").List(ctx, metav1.ListOptions{Continue: cont})
-		if kerrors.IsResourceExpired(err) {
-			// we need a consistent list, so we just restart fetching
-			d.log.Warn("service list expired, refetching all services ...")
-			s = make([]Service, 0)
-			cont = ""
-			continue
-		} else if err != nil {
-			return nil, errors.Wrap(err, "failed to retrieve kubernetes services")
-		}
-
-		for _, kserv := range l.Items { //nolint:gocritic
-			// In general we don't support non-clusterIP services
-			if kserv.Spec.ClusterIP == "None" {
-				continue
-			}
-
-			serv := Service{
-				Name:      kserv.Name,
-				Namespace: kserv.Namespace,
-				Ports:     make([]*ServicePort, 0),
-			}
-			k := serv.GetKey()
-
-			// skip services that have no ports
-			if len(kserv.Spec.Ports) == 0 {
-				continue
-			}
-
-			// convert the Kubernetes ports into our own internal data model
-			// we also handle overriding localPorts via the RemapAnnotation here.
-			servicePorts, exists, err := kube.ResolveServicePorts(ctx, d.k, &kserv) //nolint:scopelint
-			if err != nil {
-				d.log.Debug("failed to process servicePorts for service %s: %v", k, err)
-				continue
-			} else if !exists {
-				d.log.Warnf("service '%s' has no endpoints, will not forward", k)
-				continue
-			}
-
-			for _, p := range servicePorts {
-				// we only support TCP services currently.
-				if p.Protocol != corev1.ProtocolTCP {
-					continue
-				}
-
-				localPort := uint(p.Port)
-
-				// if a service only has one port, name is not required.
-				// In that case, we just name it the port. This allows users to still
-				// override it if needed.
-				if p.Name == "" {
-					p.Name = strconv.Itoa(int(p.Port))
-				}
-
-				remotePort := p.TargetPort.IntValue()
-
-				// if remote port is 0, or it was originally a string, (and unresolvable)
-				// or undefined, er assume the localPort is the same
-				if remotePort == 0 {
-					remotePort = int(localPort)
-				}
-
-				serv.Ports = append(serv.Ports, &ServicePort{
-					RemotePort: uint(remotePort),
-					LocalPort:  localPort,
-				})
-			}
-
-			s = append(s, serv)
-		}
-
-		// if we don't have a continue, then we break and return
-		if l.Continue == "" {
-			break
-		}
-
-		cont = l.Continue
+	// TODO: handle
+	// In general we don't support non-clusterIP services
+	if kserv.Spec.ClusterIP == "None" {
+		return Service{}, fmt.Errorf("service had no cluster ip")
 	}
 
-	return s, nil
+	// skip services that have no ports
+	if len(kserv.Spec.Ports) == 0 {
+		return Service{}, fmt.Errorf("service had no defined ports")
+	}
+
+	if len(kserv.Spec.Selector) == 0 {
+		log.Debug("skipping service without a selector")
+		return Service{}, fmt.Errorf("service had no selector")
+	}
+
+	// convert the Kubernetes ports into our own internal data model
+	// we also handle overriding localPorts via the RemapAnnotation here.
+	servicePorts, exists, err := kube.ResolveServicePorts(ctx, k, kserv)
+	if err != nil {
+		log.Debugf("failed to process servicePorts for service: %v", err)
+		return serv, nil
+	} else if !exists {
+		log.Debug("service has no endpoints, will not forward")
+		return serv, nil
+	}
+
+	for _, p := range servicePorts {
+		log := log.WithField("port", p.Port)
+
+		// we only support TCP services currently.
+		if p.Protocol != corev1.ProtocolTCP {
+			log.Debug("skipping non-TCP port")
+		}
+
+		localPort := uint(p.Port)
+
+		// if a service only has one port, name is not required.
+		// In that case, we just name it the port. This allows users to still
+		// override it if needed.
+		if p.Name == "" {
+			p.Name = strconv.Itoa(int(p.Port))
+		}
+
+		remotePort := p.TargetPort.IntValue()
+
+		// if remote port is 0, or it was originally a string, (and unresolvable)
+		// or undefined, er assume the localPort is the same
+		if remotePort == 0 {
+			remotePort = int(localPort)
+		}
+
+		serv.Ports = append(serv.Ports, &ServicePort{
+			RemotePort: uint(remotePort),
+			LocalPort:  localPort,
+		})
+	}
+
+	return serv, nil
 }

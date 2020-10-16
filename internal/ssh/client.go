@@ -76,7 +76,7 @@ func NewReverseTunnelClient(l logrus.FieldLogger, host string, port int, ports [
 
 // Start starts the ssh tunnel. This blocks until
 // all listeners have closed
-func (c *Client) Start(ctx context.Context) error {
+func (c *Client) Start(ctx context.Context, serviceKey string) error {
 	dialer := net.Dialer{
 		Timeout: 10 * time.Second,
 	}
@@ -118,7 +118,7 @@ func (c *Client) Start(ctx context.Context) error {
 			defer listener.Close()
 			defer wg.Done()
 
-			c.log.Infof("created tunnel from remote %d to %s", remotePort, localAddr)
+			c.log.Infof("created tunnel from remote %s:%d to %s", serviceKey, remotePort, localAddr)
 
 			// handle incoming connections on reverse forwarded tunnel
 			for {
@@ -131,8 +131,6 @@ func (c *Client) Start(ctx context.Context) error {
 				if err != nil {
 					if err != io.EOF {
 						c.log.WithError(err).Errorf("failed to accept traffic on remote listener")
-					} else {
-						c.log.Warnf("remote listener closed the connection")
 					}
 					return
 				}

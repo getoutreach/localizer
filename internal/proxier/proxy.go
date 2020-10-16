@@ -43,10 +43,12 @@ import (
 type Proxier struct {
 	k     kubernetes.Interface
 	hosts *txeh.Hosts
+	ctx   context.Context
 
 	// stores
-	podStore  cache.Store
-	servStore cache.Store
+	podStore      cache.Store
+	servStore     cache.Store
+	endpointStore cache.Store
 
 	rest  rest.Interface
 	kconf *rest.Config
@@ -69,7 +71,7 @@ type Proxier struct {
 }
 
 // NewProxier creates a new proxier instance
-func NewProxier(k kubernetes.Interface, kconf *rest.Config, l logrus.FieldLogger) *Proxier {
+func NewProxier(ctx context.Context, k kubernetes.Interface, kconf *rest.Config, l logrus.FieldLogger) *Proxier {
 	hosts, err := txeh.NewHosts(&txeh.HostsConfig{})
 	if err != nil {
 		l.Fatalf("failed to open hosts file: %v", err)
@@ -89,6 +91,7 @@ func NewProxier(k kubernetes.Interface, kconf *rest.Config, l logrus.FieldLogger
 
 	return &Proxier{
 		k:          k,
+		ctx:        ctx,
 		hosts:      hosts,
 		kconf:      kconf,
 		rest:       k.CoreV1().RESTClient(),
@@ -105,6 +108,11 @@ func NewProxier(k kubernetes.Interface, kconf *rest.Config, l logrus.FieldLogger
 
 func (p *Proxier) handleInformerEvent(ctx context.Context, event string, obj interface{}) { //nolint:funlen,gocyclo
 	k, _ := cache.MetaNamespaceKeyFunc(obj)
+	log := p.log.WithFields(logrus.Fields{
+		"event": event,
+		"type":  reflect.TypeOf(obj).String(),
+		"key":   k,
+	})
 
 	item := ""
 	switch tobj := obj.(type) {
@@ -112,35 +120,26 @@ func (p *Proxier) handleInformerEvent(ctx context.Context, event string, obj int
 		item = "pod"
 	case *corev1.Service:
 		item = "service"
+	case *corev1.Endpoints:
+		item = "endpoint"
 	case *ProxyConnection:
 		item = "connection"
 		k = tobj.Service.GetKey()
 	default:
 		// skip unknown types
-		p.log.WithFields(logrus.Fields{
-			"event": event,
-			"type":  reflect.TypeOf(obj).String(),
-			"key":   k,
-		}).Debug("ignored event")
+		log.Debug("ignored event")
 		return
 	}
+	log = log.WithField("item", item)
 
-	// we don't currently process add
-	if event == "add" {
+	// we don't currently process add for pods
+	if event == "add" && item != "endpoint" {
 		// skip unknown types
-		p.log.WithFields(logrus.Fields{
-			"event": event,
-			"type":  reflect.TypeOf(obj).String(),
-			"key":   k,
-		}).Debug("skipped event")
+		log.Debug("skipped event")
 		return
 	}
 
-	p.log.WithFields(logrus.Fields{
-		"item":  item,
-		"event": event,
-		"key":   k,
-	}).Debugf("got event")
+	log.Debugf("got event")
 
 	switch item {
 	case "pod", "connection":
@@ -188,6 +187,44 @@ func (p *Proxier) handleInformerEvent(ctx context.Context, event string, obj int
 			}
 		}
 
+	case "endpoint":
+		if event == "delete" {
+			return
+		}
+		e := obj.(*corev1.Endpoints)
+
+		// drop services with no addresses
+		if len(e.Subsets) == 0 {
+			return
+		}
+
+		s, exists, err := p.servStore.GetByKey(fmt.Sprintf("%s/%s", e.Namespace, e.Name))
+		if !exists || err != nil {
+			log.WithError(err).Debug("failed to find service for endpoint")
+			return
+		}
+		kserv := s.(*corev1.Service)
+
+		// for now skip these services
+		if kserv.Name == "kubernetes" || kserv.Namespace == "kube-system" {
+			return
+		}
+
+		// if we know of the service, drop
+		p.connMutex.Lock()
+		if pc := p.activeServices[k]; pc != nil {
+			p.connMutex.Unlock()
+			return
+		}
+		p.connMutex.Unlock()
+
+		serv, err := CreateServiceFromKubernetesService(ctx, p.log, p.k, kserv)
+		if err != nil {
+			log.WithError(err).Debug("failed to process new service being added")
+			return
+		}
+
+		p.CreateProxy(ctx, &serv)
 	case "service":
 		p.connMutex.Lock()
 		defer p.connMutex.Unlock()
@@ -226,6 +263,23 @@ func (p *Proxier) Start(ctx context.Context) error {
 		},
 	)
 
+	endpointStore, endpointInformer := cache.NewInformer(
+		cache.NewListWatchFromClient(p.k.CoreV1().RESTClient(), "endpoints", corev1.NamespaceAll, fields.Everything()),
+		&corev1.Endpoints{},
+		time.Second*0,
+		cache.ResourceEventHandlerFuncs{
+			AddFunc: func(obj interface{}) {
+				p.handleInformerEvent(ctx, "add", obj)
+			},
+			UpdateFunc: func(_, newObj interface{}) {
+				p.handleInformerEvent(ctx, "update", newObj)
+			},
+			DeleteFunc: func(obj interface{}) {
+				p.handleInformerEvent(ctx, "delete", obj)
+			},
+		},
+	)
+
 	servStore, servInformer := cache.NewInformer(
 		cache.NewListWatchFromClient(p.k.CoreV1().RESTClient(), "services", corev1.NamespaceAll, fields.Everything()),
 		&corev1.Service{},
@@ -242,6 +296,7 @@ func (p *Proxier) Start(ctx context.Context) error {
 
 	p.servStore = servStore
 	p.podStore = podStore
+	p.endpointStore = endpointStore
 
 	// start the informer
 	go podInformer.Run(ctx.Done())
@@ -251,13 +306,8 @@ func (p *Proxier) Start(ctx context.Context) error {
 		return fmt.Errorf("failed to populate informer cache")
 	}
 
-	return nil
-}
-
-// Add adds a service to our proxier. When Proxy() is called
-// this service will be proxied.
-func (p *Proxier) Add(s ...Service) error {
-	p.s = append(p.s, s...)
+	// we need the other informers to be sync'd first
+	go endpointInformer.Run(ctx.Done())
 
 	return nil
 }
@@ -357,41 +407,29 @@ func (p *Proxier) createProxy(ctx context.Context, s *Service) error { //nolint:
 	return nil
 }
 
-// Proxy starts a proxier.
-func (p *Proxier) Proxy(ctx context.Context) error {
-	var wg sync.WaitGroup
-	for _, s := range p.s {
-		wg.Add(1)
-
-		// spawn a goroutine to create the tunnel
-		go func(s Service) {
-			ticker := backoff.NewTicker(backoff.NewExponentialBackOff())
-		createLoop:
-			for {
-				select {
-				case <-ticker.C:
-					if err := p.createProxy(ctx, &s); err != nil { //nolint:scopelint
-						p.log.WithError(err).Warnf("failed to create tunnel for '%s/%s' (trying again)", s.Namespace, s.Name)
-						continue
-					}
-					ticker.Stop()
-					break createLoop
-				case <-ctx.Done():
-					break createLoop
-				}
+// CreateProxy is a wrapper around createProxy that backsoff
+func (p *Proxier) CreateProxy(ctx context.Context, s *Service) {
+	ticker := backoff.NewTicker(backoff.NewExponentialBackOff())
+createLoop:
+	for {
+		select {
+		case <-ticker.C:
+			if err := p.createProxy(ctx, s); err != nil { //nolint:scopelint
+				p.log.WithError(err).Warnf("failed to create tunnel for '%s/%s' (trying again)", s.Namespace, s.Name)
+				continue
 			}
-
-			wg.Done()
-		}(s)
+			ticker.Stop()
+			break createLoop
+		case <-ctx.Done():
+			break createLoop
+		}
 	}
+}
 
-	// wait for all of the proxies to be up
-	wg.Wait()
-
-	p.log.Info("all tunnels created successfully")
-
+// Wait waits for the proxy to shutdown and cleans up.
+func (p *Proxier) Wait() error {
 	// wait for the process to be terminated
-	<-ctx.Done()
+	<-p.ctx.Done()
 
 	p.log.Info("cleaning up ...")
 
