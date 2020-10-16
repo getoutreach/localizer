@@ -6,7 +6,8 @@
   "go.formatTool": "goimports",
   "go.alternateTools": {
     "golangci-lint": "${workspaceFolder}/scripts/golangci-lint.sh",
-    "goimports": "${workspaceFolder}/scripts/goimports.sh"
+    "goimports": "${workspaceFolder}/scripts/goimports.sh",
+    "dlv": "${workspaceFolder}/scripts/dlv-sudo.sh"
   },
   "shellcheck.customArgs": [
     "-P",
