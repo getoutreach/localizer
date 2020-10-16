@@ -209,6 +209,7 @@ func (p *ServiceForward) createTransport(ctx context.Context, po *corev1.Pod, lo
 
 	fw.Ready = make(chan struct{})
 
+	//nolint:errcheck
 	go fw.ForwardPorts()
 
 	p.c.log.Debug("waiting for transport to be marked as ready")
@@ -240,7 +241,7 @@ func (p *ServiceForward) createTransport(ctx context.Context, po *corev1.Pod, lo
 	return localPort, fw, nil
 }
 
-// Start starts forwarding a service
+// Start starts forwarding a service, this blocks
 func (p *ServiceForward) Start(ctx context.Context) error {
 	ports := make([]string, len(p.Ports))
 	for i, port := range p.Ports {

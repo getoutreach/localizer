@@ -22,6 +22,7 @@ import (
 	"os/user"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 
 	"github.com/go-logr/logr"
@@ -87,11 +88,42 @@ func (l *klogToLogrus) WithValues(keysAndValues ...interface{}) logr.Logger {
 
 // WithName adds a new element to the logger's name.
 // Successive calls with WithName continue to append
-// suffixes to the logger's name.  It's strongly reccomended
+// suffixes to the logger's name.  It's strongly recommended
 // that name segments contain only letters, digits, and hyphens
 // (see the package documentation for more information).
 func (l *klogToLogrus) WithName(name string) logr.Logger {
 	return l
+}
+
+func mapPorts(c *cli.Context, log logrus.FieldLogger, servicePorts []kube.ResolvedServicePort) error {
+	log.Debugf("map %v", c.StringSlice("map"))
+	for _, portOverride := range c.StringSlice("map") {
+		spl := strings.Split(portOverride, ":")
+		if len(spl) != 2 {
+			return fmt.Errorf("invalid port map '%s', expected 'local:remote'", portOverride)
+		}
+
+		local, err := strconv.ParseUint(spl[0], 10, 0)
+		if err != nil {
+			return errors.Wrapf(err, "failed to parse port map '%s'", portOverride)
+		}
+
+		rem, err := strconv.ParseUint(spl[1], 10, 0)
+		if err != nil {
+			return errors.Wrapf(err, "failed to parse port map '%s'", portOverride)
+		}
+
+		// TODO: this is slow...
+		for i, sp := range servicePorts {
+			log.Debugf("checking if we need to map %s, using %d:%d", sp.TargetPort.String(), rem, local)
+			if uint(servicePorts[i].TargetPort.IntValue()) == uint(rem) {
+				log.Debugf("mapping remote port %d -> %d locally", rem, local)
+				servicePorts[i].MappedPort = uint(local)
+			}
+		}
+	}
+
+	return nil
 }
 
 func main() { //nolint:funlen,gocyclo
@@ -102,8 +134,9 @@ func main() { //nolint:funlen,gocyclo
 	var k kubernetes.Interface
 
 	app := cli.App{
-		Version: "1.0.0",
-		Name:    "localizer",
+		Version:              "1.0.0",
+		EnableBashCompletion: true,
+		Name:                 "localizer",
 		Flags: []cli.Flag{
 			// Note: KUBECONFIG is respected, but we don't allow passing a
 			// CLI argument to reduce the complexity and re-parsing of it.
@@ -137,7 +170,7 @@ func main() { //nolint:funlen,gocyclo
 			{
 				Name:        "expose",
 				Description: "Expose ports for a given service to Kubernetes",
-				Usage:       "expose <service>",
+				Usage:       "expose <namespace/service>...",
 				Flags: []cli.Flag{
 					&cli.StringSliceFlag{
 						Name:  "map",
@@ -145,69 +178,9 @@ func main() { //nolint:funlen,gocyclo
 					},
 				},
 				Action: func(c *cli.Context) error {
-					service := c.Args().Get(0)
-					if service == "" {
+					services := c.Args().Slice()
+					if len(services) == 0 {
 						return fmt.Errorf("missing service")
-					}
-
-					serviceSplit := strings.Split(service, "/")
-					if len(serviceSplit) != 2 {
-						return fmt.Errorf("serviceName should be in the format: namespace/serviceName")
-					}
-
-					// discover the service's ports
-					s, err := k.CoreV1().Services(serviceSplit[0]).Get(ctx, serviceSplit[1], metav1.GetOptions{})
-					if err != nil {
-						return errors.Wrapf(err, "failed to get service '%s'", service)
-					}
-
-					if len(s.Spec.Ports) == 0 {
-						return fmt.Errorf("service had no defined ports")
-					}
-
-					servicePorts, exists, err := kube.ResolveServicePorts(ctx, k, s)
-					if err != nil {
-						return errors.Wrap(err, "failed to resolve service ports")
-					}
-
-					// if we couldn't find endpoints, then we fall back to binding whatever the
-					// public port of the service is if it is named
-					if !exists {
-						for i, sp := range servicePorts {
-							if servicePorts[i].TargetPort.Type == intstr.String {
-								log.Warnf("failed to determine the value of port %s, using public port %d", sp.TargetPort.String(), sp.Port)
-								servicePorts[i].TargetPort = intstr.FromInt(int(sp.Port))
-							}
-						}
-
-						log.Debug("service has no endpoints")
-					}
-
-					log.Debugf("map %v", c.StringSlice("map"))
-					for _, portOverride := range c.StringSlice("map") {
-						spl := strings.Split(portOverride, ":")
-						if len(spl) != 2 {
-							return fmt.Errorf("invalid port map '%s', expected 'local:remote'", portOverride)
-						}
-
-						local, err := strconv.ParseUint(spl[0], 10, 0)
-						if err != nil {
-							return errors.Wrapf(err, "failed to parse port map '%s'", portOverride)
-						}
-
-						rem, err := strconv.ParseUint(spl[1], 10, 0)
-						if err != nil {
-							return errors.Wrapf(err, "failed to parse port map '%s'", portOverride)
-						}
-
-						// TODO: this is slow...
-						for i, sp := range servicePorts {
-							log.Debugf("checking if we need to map %s, using %d:%d", sp.TargetPort.String(), rem, local)
-							if uint(servicePorts[i].TargetPort.IntValue()) == uint(rem) {
-								log.Debugf("mapping remote port %d -> %d locally", rem, local)
-								servicePorts[i].MappedPort = uint(local)
-							}
-						}
 					}
 
 					e := expose.NewExposer(k, kconf, log)
@@ -215,12 +188,72 @@ func main() { //nolint:funlen,gocyclo
 						return err
 					}
 
-					p, err := e.Expose(ctx, servicePorts, serviceSplit[0], serviceSplit[1])
-					if err != nil {
-						return errors.Wrap(err, "failed to create reverse tunnel")
+					// build the exposers
+					exposers := make([]*expose.ServiceForward, len(services))
+					for i, service := range c.Args().Slice() {
+						serviceSplit := strings.Split(service, "/")
+						if len(serviceSplit) != 2 {
+							return fmt.Errorf("serviceName should be in the format: namespace/serviceName")
+						}
+
+						// discover the service's ports
+						s, err := k.CoreV1().Services(serviceSplit[0]).Get(ctx, serviceSplit[1], metav1.GetOptions{})
+						if err != nil {
+							return errors.Wrapf(err, "failed to get service '%s'", service)
+						}
+
+						if len(s.Spec.Ports) == 0 {
+							return fmt.Errorf("service had no defined ports")
+						}
+
+						servicePorts, exists, err := kube.ResolveServicePorts(ctx, k, s)
+						if err != nil {
+							return errors.Wrap(err, "failed to resolve service ports")
+						}
+
+						// handle mapped ports
+						if err := mapPorts(c, log, servicePorts); err != nil {
+							return err
+						}
+
+						// if we couldn't find endpoints, then we fall back to binding whatever the
+						// public port of the service is if it is named
+						if !exists {
+							for i, sp := range servicePorts {
+								if servicePorts[i].TargetPort.Type == intstr.String {
+									log.Warnf("failed to determine the value of port %s, using public port %d", sp.TargetPort.String(), sp.Port)
+									servicePorts[i].TargetPort = intstr.FromInt(int(sp.Port))
+								}
+							}
+
+							log.Debug("service has no endpoints")
+						}
+
+						e, err := e.Expose(ctx, servicePorts, serviceSplit[0], serviceSplit[1])
+						if err != nil {
+							return errors.Wrap(err, "failed to create reverse tunnel")
+						}
+						exposers[i] = e
 					}
 
-					return p.Start(ctx)
+					wg := sync.WaitGroup{}
+
+					var lastErr error
+					for _, e := range exposers {
+						wg.Add(1)
+						go func(e *expose.ServiceForward) {
+							err := e.Start(ctx)
+							if err != nil {
+								cancel()
+								lastErr = err
+							}
+							wg.Done()
+						}(e)
+					}
+
+					// wait for them to all finish
+					wg.Wait()
+					return lastErr
 				},
 			},
 		},
