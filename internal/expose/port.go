@@ -209,6 +209,7 @@ func (p *ServiceForward) createTransport(ctx context.Context, po *corev1.Pod, lo
 
 	fw.Ready = make(chan struct{})
 
+	//nolint:errcheck
 	go fw.ForwardPorts()
 
 	p.c.log.Debug("waiting for transport to be marked as ready")
