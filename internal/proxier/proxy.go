@@ -171,22 +171,7 @@ func (p *Proxier) handleInformerEvent(ctx context.Context, event string, obj int
 		p.connMutex.Unlock()
 
 		p.log.Warnf("tunnel for %s is being refreshed due to underlying pod being destroyed", serviceKey)
-		ticker := backoff.NewTicker(backoff.NewExponentialBackOff())
-		for {
-			select {
-			case <-ticker.C:
-				if err := p.createProxy(ctx, &s); err != nil { //nolint:scopelint
-					p.log.WithError(err).Warnf("failed to refresh tunnel for %s (trying again)", serviceKey)
-					continue
-				}
-				ticker.Stop()
-				p.log.Infof("refreshed tunnel for '%s'", serviceKey)
-				return
-			case <-ctx.Done():
-				return
-			}
-		}
-
+		p.CreateProxy(ctx, &s)
 	case "endpoint":
 		if event == "delete" {
 			return

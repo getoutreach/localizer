@@ -22,9 +22,7 @@ import (
 	"github.com/jaredallard/localizer/internal/kube"
 	"github.com/metal-stack/go-ipam"
 	"github.com/pkg/errors"
-	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/portforward"
 )
 
@@ -50,18 +48,32 @@ type ProxyConnection struct {
 // for a given kubernetes service
 func (pc *ProxyConnection) GetAddresses() []string {
 	s := pc.Service
+
+	name := s.Name
+	namespace := s.Namespace
+
+	// TODO: This is a quick hack for -0
+	// but ultimately we need to support all the pods
+	// in a statefulset service
+	if s.Type == "StatefulSet" {
+		pc.proxier.log.WithField("service", pc.Service.GetKey()).Debug("proxying a statefulset")
+		name = pc.Pod.Name + "." + s.Name
+	}
+
 	return []string{
-		s.Name,
-		fmt.Sprintf("%s.%s", s.Name, s.Namespace),
-		fmt.Sprintf("%s.%s.svc", s.Name, s.Namespace),
-		fmt.Sprintf("%s.%s.svc.cluster", s.Name, s.Namespace),
-		fmt.Sprintf("%s.%s.svc.cluster.local", s.Name, s.Namespace),
+		name,
+		fmt.Sprintf("%s.%s", name, namespace),
+		fmt.Sprintf("%s.%s.svc", name, namespace),
+		fmt.Sprintf("%s.%s.svc.cluster", name, namespace),
+		fmt.Sprintf("%s.%s.svc.cluster.local", name, namespace),
 	}
 }
 
 // Start starts a proxy connection
 func (pc *ProxyConnection) Start(ctx context.Context) error {
 	serviceKey := pc.Service.GetKey()
+	log := pc.proxier.log.WithField("service", serviceKey)
+
 	ipAddress, err := pc.proxier.allocateIP(serviceKey)
 	if err != nil {
 		return errors.Wrap(err, "failed to allocate IP")
@@ -75,7 +87,7 @@ func (pc *ProxyConnection) Start(ctx context.Context) error {
 	pc.fw = fw
 
 	// only add addresses for services we actually are routing to
-	pc.proxier.log.Debugf("adding hosts file entry for service '%s'", serviceKey)
+	log.Debugf("adding hosts file entry for service")
 	pc.proxier.hosts.AddHosts(pc.IP.IP.String(), pc.GetAddresses())
 	if err := pc.proxier.hosts.Save(); err != nil {
 		return errors.Wrap(err, "failed to save address to hosts")
@@ -88,11 +100,7 @@ func (pc *ProxyConnection) Start(ctx context.Context) error {
 			pc.Close()
 			pc.fw = nil
 
-			k, _ := cache.MetaNamespaceKeyFunc(pc.Service)
-			pc.proxier.log.WithError(err).WithFields(logrus.Fields{
-				"ports":   pc.Ports,
-				"service": k,
-			}).Debug("tunnel died")
+			log.WithError(err).WithField("ports", pc.Ports).Debug("tunnel died")
 
 			// trigger the recreate logic
 			pc.proxier.handleInformerEvent(ctx, "connection-dead", pc)
@@ -117,7 +125,7 @@ func (pc *ProxyConnection) Close() error {
 	}
 
 	// cleanup the DNS entries for this ProxyConnection
-	pc.proxier.hosts.RemoveAddresses(pc.GetAddresses())
+	pc.proxier.hosts.RemoveHosts(pc.GetAddresses())
 	if err := pc.proxier.hosts.Save(); err != nil {
 		return errors.Wrap(err, "failed to remove hosts entry")
 	}

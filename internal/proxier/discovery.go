@@ -36,7 +36,10 @@ const (
 type Service struct {
 	Name      string
 	Namespace string
-	Ports     []*ServicePort
+
+	// Type is if it's a: ClusterIP, or StatefulSet
+	Type  string
+	Ports []*ServicePort
 }
 
 // GetKey returns a cache stable key for a Service
@@ -58,15 +61,10 @@ func CreateServiceFromKubernetesService(ctx context.Context, olog logrus.FieldLo
 		Name:      kserv.Name,
 		Namespace: kserv.Namespace,
 		Ports:     make([]*ServicePort, 0),
+		Type:      "ClusterIP",
 	}
 	key := serv.GetKey()
 	log := olog.WithField("service", key)
-
-	// TODO: handle
-	// In general we don't support non-clusterIP services
-	if kserv.Spec.ClusterIP == "None" {
-		return Service{}, fmt.Errorf("service had no cluster ip")
-	}
 
 	// skip services that have no ports
 	if len(kserv.Spec.Ports) == 0 {
@@ -76,6 +74,10 @@ func CreateServiceFromKubernetesService(ctx context.Context, olog logrus.FieldLo
 	if len(kserv.Spec.Selector) == 0 {
 		log.Debug("skipping service without a selector")
 		return Service{}, fmt.Errorf("service had no selector")
+	}
+
+	if kserv.Spec.ClusterIP == "None" {
+		serv.Type = "StatefulSet"
 	}
 
 	// convert the Kubernetes ports into our own internal data model
