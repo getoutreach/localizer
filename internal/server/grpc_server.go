@@ -40,6 +40,7 @@ type GRPCServiceHandler struct {
 	kconf *rest.Config
 	ctx   context.Context
 	exp   *Exposer
+	p     *proxier.Proxier
 	///EndBlock(grpcConfig)
 }
 
@@ -61,21 +62,14 @@ func NewServiceHandler(ctx context.Context, log logrus.FieldLogger) (*GRPCServic
 		return nil, errors.Wrap(err, "failed to start expose container")
 	}
 
+	p := proxier.NewProxier(ctx, k, kconf, log)
+
 	// start the tunnel
 	go func() {
-		p := proxier.NewProxier(ctx, k, kconf, log)
-
 		log.Debug("waiting for caches to sync")
 		if err := p.Start(ctx); err != nil {
-			log.WithError(err).Fatal("failed to start proxy informers")
+			log.WithError(err).Error("failed to start proxy informers")
 		}
-
-		if err := p.Wait(); err != nil {
-			log.WithError(err).Fatal("failed to start tunnel")
-		}
-
-		// TODO: We should better handle this shutdown.
-		log.Info("tunnel process died")
 	}()
 	///EndBlock(grpcInit)
 
@@ -86,6 +80,7 @@ func NewServiceHandler(ctx context.Context, log logrus.FieldLogger) (*GRPCServic
 		kconf: kconf,
 		ctx:   ctx,
 		exp:   exp,
+		p:     p,
 		///EndBlock(grpcConfigInit)
 	}, nil
 }

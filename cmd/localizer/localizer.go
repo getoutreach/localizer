@@ -96,6 +96,13 @@ func main() { //nolint:funlen,gocyclo
 	ctx, cancel := context.WithCancel(context.Background())
 	log := logrus.New()
 
+	// this prevents the CLI from clobbering context cancellation
+	cli.OsExiter = func(code int) {
+		if code != 0 {
+			os.Exit(code)
+		}
+	}
+
 	app := cli.App{
 		Version:              "1.0.0",
 		EnableBashCompletion: true,

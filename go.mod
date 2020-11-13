@@ -11,7 +11,7 @@ require (
 	github.com/function61/gokit v0.0.0-20200923114939-f8d7e065a5c3
 	github.com/go-logr/logr v0.3.0
 	github.com/golang/protobuf v1.4.3
-	github.com/imdario/mergo v0.3.8 // indirect
+	github.com/imdario/mergo v0.3.8
 	github.com/metal-stack/go-ipam v1.7.0
 	github.com/pkg/errors v0.9.1
 	github.com/sirupsen/logrus v1.7.0

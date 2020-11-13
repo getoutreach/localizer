@@ -70,5 +70,15 @@ func (g *GRPCService) Run(ctx context.Context, log logrus.FieldLogger) error {
 
 	// One day Serve() will accept a context?
 	log.Infof("starting GRPC server on '%s'", SocketPath)
-	return errors.Wrap(g.srv.Serve(g.lis), "unexpected grpc.Serve error")
+	if g.srv.Serve(g.lis) != nil {
+		return errors.Wrap(err, "unexpected grpc.Serve error")
+	}
+
+	// wait for sub-processes to finish
+	if err := h.p.Wait(); err != nil {
+		log.WithError(err).Warn("failed to cleanup tunnels")
+	}
+	h.exp.Wait()
+
+	return nil
 }

@@ -68,6 +68,7 @@ type Exposer struct {
 	pfMutex      sync.Mutex
 
 	workerChan chan newExpose
+	doneChan   chan struct{}
 }
 
 // NewExposer creates a service that can maintain multiple expose instances
@@ -85,6 +86,7 @@ func NewExposer(parentCtx context.Context, k kubernetes.Interface, kconf *rest.C
 		parentCtx:    parentCtx,
 		portForwards: make(map[string]context.CancelFunc),
 		workerChan:   make(chan newExpose),
+		doneChan:     make(chan struct{}),
 	}
 
 	go exp.worker()
@@ -97,13 +99,18 @@ func getKey(namespace, serviceName string) string {
 }
 
 func (e *Exposer) worker() { //nolint:lostcancel
+	// when this exits we're essentially done
+	defer close(e.doneChan)
+
 	wg := sync.WaitGroup{}
 	for {
 		select {
 		case <-e.parentCtx.Done():
 			e.log.Info("waiting for exposes to finish")
+
 			// wait for the connections to close
 			wg.Wait()
+
 			return
 		case expMsg := <-e.workerChan:
 			key := getKey(expMsg.namespace, expMsg.serviceName)
@@ -158,6 +165,13 @@ func (e *Exposer) Close(namespace, serviceName string) error {
 	e.portForwards[k]()
 
 	return nil
+}
+
+// Wait waits for all exposes to be shut down
+func (e *Exposer) Wait() {
+	<-e.doneChan
+
+	e.log.Info("exposes cleaned up")
 }
 
 func (e *Exposer) Start(ports []kube.ResolvedServicePort, namespace, serviceName string) error {
