@@ -16,27 +16,24 @@ package main
 import (
 	"context"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"os"
 	"os/signal"
 	"os/user"
-	"strconv"
 	"strings"
-	"sync"
 	"syscall"
+	"time"
 
 	"github.com/go-logr/logr"
-	"github.com/jaredallard/localizer/internal/expose"
-	"github.com/jaredallard/localizer/internal/kube"
-	"github.com/jaredallard/localizer/internal/proxier"
+	"github.com/jaredallard/localizer/internal/server"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/intstr"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
+	"google.golang.org/grpc"
 	"k8s.io/klog/v2"
+
+	apiv1 "github.com/jaredallard/localizer/api/v1"
 )
 
 type klogToLogrus struct {
@@ -95,43 +92,9 @@ func (l *klogToLogrus) WithName(name string) logr.Logger {
 	return l
 }
 
-func mapPorts(c *cli.Context, log logrus.FieldLogger, servicePorts []kube.ResolvedServicePort) error {
-	log.Debugf("map %v", c.StringSlice("map"))
-	for _, portOverride := range c.StringSlice("map") {
-		spl := strings.Split(portOverride, ":")
-		if len(spl) != 2 {
-			return fmt.Errorf("invalid port map '%s', expected 'local:remote'", portOverride)
-		}
-
-		local, err := strconv.ParseUint(spl[0], 10, 0)
-		if err != nil {
-			return errors.Wrapf(err, "failed to parse port map '%s'", portOverride)
-		}
-
-		rem, err := strconv.ParseUint(spl[1], 10, 0)
-		if err != nil {
-			return errors.Wrapf(err, "failed to parse port map '%s'", portOverride)
-		}
-
-		// TODO: this is slow...
-		for i, sp := range servicePorts {
-			log.Debugf("checking if we need to map %s, using %d:%d", sp.TargetPort.String(), rem, local)
-			if uint(servicePorts[i].TargetPort.IntValue()) == uint(rem) {
-				log.Debugf("mapping remote port %d -> %d locally", rem, local)
-				servicePorts[i].MappedPort = uint(local)
-			}
-		}
-	}
-
-	return nil
-}
-
 func main() { //nolint:funlen,gocyclo
 	ctx, cancel := context.WithCancel(context.Background())
 	log := logrus.New()
-
-	var kconf *rest.Config
-	var k kubernetes.Interface
 
 	app := cli.App{
 		Version:              "1.0.0",
@@ -162,90 +125,81 @@ func main() { //nolint:funlen,gocyclo
 			{
 				Name:        "expose",
 				Description: "Expose ports for a given service to Kubernetes",
-				Usage:       "expose <namespace/service>...",
+				Usage:       "expose <namespace/service>",
 				Flags: []cli.Flag{
 					&cli.StringSliceFlag{
 						Name:  "map",
 						Usage: "Map a local port to a remote port, i.e --map 80:8080 will bind what is normally :8080 to :80 locally",
 					},
+					&cli.BoolFlag{
+						Name:  "stop",
+						Usage: "stop exposing a service",
+					},
 				},
+				// TODO: multiple service support before this gets released
 				Action: func(c *cli.Context) error {
-					services := c.Args().Slice()
-					if len(services) == 0 {
-						return fmt.Errorf("missing service")
+					split := strings.Split(c.Args().First(), "/")
+					if len(split) != 2 {
+						return fmt.Errorf("invalid service, expected namespace/name")
 					}
 
-					e := expose.NewExposer(k, kconf, log)
-					if err := e.Start(ctx); err != nil {
+					serviceNamespace := split[0]
+					serviceName := split[1]
+
+					if _, err := os.Stat(server.SocketPath); os.IsNotExist(err) {
+						return fmt.Errorf("localizer daemon not running (run localizer by itself?)")
+					}
+
+					log.Info("connecting to localizer daemon")
+					conn, err := grpc.DialContext(ctx, "unix://"+server.SocketPath,
+						grpc.WithBlock(), grpc.WithInsecure(), grpc.WithTimeout(30*time.Second))
+					if err != nil {
+						return errors.Wrap(err, "failed to talk to localizer daemon")
+					}
+
+					cli := apiv1.NewLocalizerServiceClient(conn)
+
+					var stream apiv1.LocalizerService_ExposeServiceClient
+					if c.Bool("stop") {
+						log.Info("sending stop expose request to daemon")
+						stream, err = cli.StopExpose(ctx, &apiv1.StopExposeRequest{
+							Namespace: serviceNamespace,
+							Service:   serviceName,
+						})
+					} else {
+						log.Info("sending expose request to daemon")
+						stream, err = cli.ExposeService(ctx, &apiv1.ExposeServiceRequest{
+							PortMap:   c.StringSlice("map"),
+							Namespace: serviceNamespace,
+							Service:   serviceName,
+						})
+					}
+					if err != nil {
 						return err
 					}
 
-					// build the exposers
-					exposers := make([]*expose.ServiceForward, len(services))
-					for i, service := range c.Args().Slice() {
-						serviceSplit := strings.Split(service, "/")
-						if len(serviceSplit) != 2 {
-							return fmt.Errorf("serviceName should be in the format: namespace/serviceName")
+					for {
+						res, err := stream.Recv()
+						if err == io.EOF {
+							return nil
 						}
 
-						// discover the service's ports
-						s, err := k.CoreV1().Services(serviceSplit[0]).Get(ctx, serviceSplit[1], metav1.GetOptions{})
+						// errors responses get caught here, so we just return them
 						if err != nil {
-							return errors.Wrapf(err, "failed to get service '%s'", service)
-						}
-
-						if len(s.Spec.Ports) == 0 {
-							return fmt.Errorf("service had no defined ports")
-						}
-
-						servicePorts, exists, err := kube.ResolveServicePorts(ctx, k, s)
-						if err != nil {
-							return errors.Wrap(err, "failed to resolve service ports")
-						}
-
-						// handle mapped ports
-						if err := mapPorts(c, log, servicePorts); err != nil {
 							return err
 						}
 
-						// if we couldn't find endpoints, then we fall back to binding whatever the
-						// public port of the service is if it is named
-						if !exists {
-							for i, sp := range servicePorts {
-								if servicePorts[i].TargetPort.Type == intstr.String {
-									log.Warnf("failed to determine the value of port %s, using public port %d", sp.TargetPort.String(), sp.Port)
-									servicePorts[i].TargetPort = intstr.FromInt(int(sp.Port))
-								}
-							}
-
-							log.Debug("service has no endpoints")
+						logger := log.Info
+						switch res.Level {
+						case apiv1.ConsoleLevel_CONSOLE_LEVEL_INFO, apiv1.ConsoleLevel_CONSOLE_LEVEL_UNSPECIFIED:
+						case apiv1.ConsoleLevel_CONSOLE_LEVEL_WARN:
+							logger = log.Warn
+						case apiv1.ConsoleLevel_CONSOLE_LEVEL_ERROR:
+							logger = log.Error
 						}
 
-						e, err := e.Expose(ctx, servicePorts, serviceSplit[0], serviceSplit[1])
-						if err != nil {
-							return errors.Wrap(err, "failed to create reverse tunnel")
-						}
-						exposers[i] = e
+						logger(res.Message)
 					}
-
-					wg := sync.WaitGroup{}
-
-					var lastErr error
-					for _, e := range exposers {
-						wg.Add(1)
-						go func(e *expose.ServiceForward) {
-							err := e.Start(ctx)
-							if err != nil {
-								cancel()
-								lastErr = err
-							}
-							wg.Done()
-						}(e)
-					}
-
-					// wait for them to all finish
-					wg.Wait()
-					return lastErr
 				},
 			},
 		},
@@ -281,22 +235,11 @@ func main() { //nolint:funlen,gocyclo
 			discardLogger.Out = ioutil.Discard
 			klog.SetLogger(&klogToLogrus{log: discardLogger})
 
-			kconf, k, err = kube.GetKubeClient(c.String("context"))
-			if err != nil {
-				return errors.Wrap(err, "failed to create kube client")
-			}
-
 			return nil
 		},
 		Action: func(c *cli.Context) error {
-			p := proxier.NewProxier(ctx, k, kconf, log)
-
-			log.Debug("waiting for caches to sync")
-			if err := p.Start(ctx); err != nil {
-				return errors.Wrap(err, "failed to start proxy informers")
-			}
-
-			return errors.Wrap(p.Wait(), "failed to start proxier")
+			srv := server.NewGRPCService()
+			return srv.Run(ctx, log)
 		},
 	}
 

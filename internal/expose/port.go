@@ -267,7 +267,6 @@ func (p *ServiceForward) Start(ctx context.Context) error {
 		}
 	}()
 
-	// TODO(jaredallard): handle pod being destroyed
 	lastErr := ErrNotInitialized
 	localPort := 0
 	cleanupFn := func() {}
