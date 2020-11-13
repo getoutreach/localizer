@@ -99,6 +99,14 @@ func (p *ServiceForward) createServerPod(ctx context.Context) (func(), *corev1.P
 		return func() {}, nil, err
 	}
 
+	// add a label for localizer pods
+	labels := map[string]string{
+		"localizer.jaredallard.github.com/exposed": "true",
+	}
+	for k, v := range p.Selector {
+		labels[k] = v
+	}
+
 	podObject := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace:    p.Namespace,
@@ -107,7 +115,7 @@ func (p *ServiceForward) createServerPod(ctx context.Context) (func(), *corev1.P
 				proxier.ExposedAnnotation:          "true",
 				proxier.ExposedLocalPortAnnotation: string(exposedPortsJSON),
 			},
-			Labels: p.Selector,
+			Labels: labels,
 		},
 		Spec: corev1.PodSpec{
 			RestartPolicy: corev1.RestartPolicyOnFailure,
@@ -267,7 +275,6 @@ func (p *ServiceForward) Start(ctx context.Context) error {
 		}
 	}()
 
-	// TODO(jaredallard): handle pod being destroyed
 	lastErr := ErrNotInitialized
 	localPort := 0
 	cleanupFn := func() {}

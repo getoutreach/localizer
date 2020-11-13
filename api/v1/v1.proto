@@ -1,0 +1,38 @@
+syntax = "proto3";
+
+package api.v1;
+option go_package = "github.com/jaredallard/localizer/api/v1";
+
+
+message ExposeServiceRequest {
+  string namespace = 1;
+  string service = 2;
+  repeated string port_map = 3;
+}
+
+message StopExposeRequest {
+  string namespace = 1;
+  string service = 2;
+}
+
+enum ConsoleLevel {
+  CONSOLE_LEVEL_UNSPECIFIED = 0;
+  CONSOLE_LEVEL_INFO = 1;
+  CONSOLE_LEVEL_WARN = 2;
+  CONSOLE_LEVEL_ERROR = 3;
+}
+
+// This will be turned into ConsoleResponse to be generic probably some
+// time later in the future.
+message ConsoleResponse {
+  // Output level of this console output
+  ConsoleLevel level = 1;
+
+  // Message of this console output
+  string message = 2;
+}
+
+service LocalizerService {
+  rpc ExposeService(ExposeServiceRequest) returns (stream ConsoleResponse) {}
+  rpc StopExpose(StopExposeRequest) returns (stream ConsoleResponse) {}
+}
