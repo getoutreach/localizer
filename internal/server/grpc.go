@@ -19,7 +19,6 @@ import (
 	"net"
 	"os"
 
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
@@ -70,14 +69,17 @@ func (g *GRPCService) Run(ctx context.Context, log logrus.FieldLogger) error {
 
 	// One day Serve() will accept a context?
 	log.Infof("starting GRPC server on '%s'", SocketPath)
-	if g.srv.Serve(g.lis) != nil {
-		return errors.Wrap(err, "unexpected grpc.Serve error")
+	go func() {
+		err := g.srv.Serve(g.lis)
+		if err != nil {
+			log.WithError(err).Error("grpc server exited")
+		}
+	}()
+
+	if err := h.p.Start(ctx); err != nil {
+		log.WithError(err).Error("failed to start proxy informers")
 	}
 
-	// wait for sub-processes to finish
-	if err := h.p.Wait(); err != nil {
-		log.WithError(err).Warn("failed to cleanup tunnels")
-	}
 	h.exp.Wait()
 
 	return nil

@@ -63,14 +63,6 @@ func NewServiceHandler(ctx context.Context, log logrus.FieldLogger) (*GRPCServic
 	}
 
 	p := proxier.NewProxier(ctx, k, kconf, log)
-
-	// start the tunnel
-	go func() {
-		log.Debug("waiting for caches to sync")
-		if err := p.Start(ctx); err != nil {
-			log.WithError(err).Error("failed to start proxy informers")
-		}
-	}()
 	///EndBlock(grpcInit)
 
 	return &GRPCServiceHandler{

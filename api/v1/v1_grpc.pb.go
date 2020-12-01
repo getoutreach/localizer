@@ -19,6 +19,7 @@ const _ = grpc.SupportPackageIsVersion7
 type LocalizerServiceClient interface {
 	ExposeService(ctx context.Context, in *ExposeServiceRequest, opts ...grpc.CallOption) (LocalizerService_ExposeServiceClient, error)
 	StopExpose(ctx context.Context, in *StopExposeRequest, opts ...grpc.CallOption) (LocalizerService_StopExposeClient, error)
+	List(ctx context.Context, in *ListRequest, opts ...grpc.CallOption) (*ListResponse, error)
 }
 
 type localizerServiceClient struct {
@@ -93,12 +94,22 @@ func (x *localizerServiceStopExposeClient) Recv() (*ConsoleResponse, error) {
 	return m, nil
 }
 
+func (c *localizerServiceClient) List(ctx context.Context, in *ListRequest, opts ...grpc.CallOption) (*ListResponse, error) {
+	out := new(ListResponse)
+	err := c.cc.Invoke(ctx, "/api.v1.LocalizerService/List", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // LocalizerServiceServer is the server API for LocalizerService service.
 // All implementations must embed UnimplementedLocalizerServiceServer
 // for forward compatibility
 type LocalizerServiceServer interface {
 	ExposeService(*ExposeServiceRequest, LocalizerService_ExposeServiceServer) error
 	StopExpose(*StopExposeRequest, LocalizerService_StopExposeServer) error
+	List(context.Context, *ListRequest) (*ListResponse, error)
 	mustEmbedUnimplementedLocalizerServiceServer()
 }
 
@@ -111,6 +122,9 @@ func (UnimplementedLocalizerServiceServer) ExposeService(*ExposeServiceRequest, 
 }
 func (UnimplementedLocalizerServiceServer) StopExpose(*StopExposeRequest, LocalizerService_StopExposeServer) error {
 	return status.Errorf(codes.Unimplemented, "method StopExpose not implemented")
+}
+func (UnimplementedLocalizerServiceServer) List(context.Context, *ListRequest) (*ListResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method List not implemented")
 }
 func (UnimplementedLocalizerServiceServer) mustEmbedUnimplementedLocalizerServiceServer() {}
 
@@ -167,10 +181,33 @@ func (x *localizerServiceStopExposeServer) Send(m *ConsoleResponse) error {
 	return x.ServerStream.SendMsg(m)
 }
 
+func _LocalizerService_List_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(LocalizerServiceServer).List(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/api.v1.LocalizerService/List",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(LocalizerServiceServer).List(ctx, req.(*ListRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 var _LocalizerService_serviceDesc = grpc.ServiceDesc{
 	ServiceName: "api.v1.LocalizerService",
 	HandlerType: (*LocalizerServiceServer)(nil),
-	Methods:     []grpc.MethodDesc{},
+	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "List",
+			Handler:    _LocalizerService_List_Handler,
+		},
+	},
 	Streams: []grpc.StreamDesc{
 		{
 			StreamName:    "ExposeService",

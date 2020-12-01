@@ -15,14 +15,12 @@ package expose
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/jaredallard/localizer/internal/kube"
-	"github.com/jaredallard/localizer/internal/proxier"
 	"github.com/jaredallard/localizer/internal/ssh"
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
@@ -93,12 +91,6 @@ func (p *ServiceForward) createServerPod(ctx context.Context) (func(), *corev1.P
 		containerPorts[i] = cp
 	}
 
-	// create a pod for our new expose service
-	exposedPortsJSON, err := json.Marshal(containerPorts)
-	if err != nil {
-		return func() {}, nil, err
-	}
-
 	// add a label for localizer pods
 	labels := map[string]string{
 		"localizer.jaredallard.github.com/exposed": "true",
@@ -111,11 +103,7 @@ func (p *ServiceForward) createServerPod(ctx context.Context) (func(), *corev1.P
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace:    p.Namespace,
 			GenerateName: fmt.Sprintf("localizer-%s-", p.ServiceName),
-			Annotations: map[string]string{
-				proxier.ExposedAnnotation:          "true",
-				proxier.ExposedLocalPortAnnotation: string(exposedPortsJSON),
-			},
-			Labels: labels,
+			Labels:       labels,
 		},
 		Spec: corev1.PodSpec{
 			RestartPolicy: corev1.RestartPolicyOnFailure,
