@@ -15,6 +15,7 @@ package proxier
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -28,9 +29,20 @@ import (
 // Proxier handles creating an maintaining proxies to a remote
 // Kubernetes service
 type Proxier struct {
-	k    kubernetes.Interface
-	rest *rest.Config
-	log  logrus.FieldLogger
+	k      kubernetes.Interface
+	rest   *rest.Config
+	log    logrus.FieldLogger
+	worker *worker
+}
+
+type ServiceStatus struct {
+	ServiceInfo ServiceInfo
+
+	// Statuses is dependent on the number of tunnels that exist for this
+	// connection. Generally this is one, since a service is usually one
+	// connection. However, if this is a statefulset, this will be equal
+	// to the number of pod.
+	Statuses []PortForwardStatus
 }
 
 // NewProxier creates a new proxier instance
@@ -44,12 +56,13 @@ func NewProxier(ctx context.Context, k kubernetes.Interface, kconf *rest.Config,
 
 // Start starts the proxier
 func (p *Proxier) Start(ctx context.Context) error {
-	portForwarder, pfdoneChan, err := NewPortForwarder(ctx, p.k, p.rest, p.log)
+	portForwarder, pfdoneChan, worker, err := NewPortForwarder(ctx, p.k, p.rest, p.log)
 	if err != nil {
 		return err
 	}
+	p.worker = worker
 
-	serviceChan, handlerDoneChan := CreateHandlers(ctx, portForwarder)
+	serviceChan, handlerDoneChan := CreateHandlers(ctx, portForwarder, p.k)
 
 	_, servInformer := cache.NewInformer(
 		cache.NewListWatchFromClient(p.k.CoreV1().RESTClient(), "services", corev1.NamespaceAll, fields.Everything()),
@@ -79,4 +92,25 @@ func (p *Proxier) Start(ctx context.Context) error {
 	<-pfdoneChan
 
 	return nil
+}
+
+func (p *Proxier) List(ctx context.Context) ([]ServiceStatus, error) {
+	if p.worker == nil {
+		return nil, fmt.Errorf("proxier not running")
+	}
+
+	statuses := make([]ServiceStatus, 0)
+	for serv := range p.worker.portForwards {
+		connStatuses := make([]PortForwardStatus, len(p.worker.portForwards[serv]))
+		for i := range p.worker.portForwards[serv] {
+			connStatuses[i] = p.worker.portForwards[serv][i].Status
+		}
+
+		statuses = append(statuses, ServiceStatus{
+			ServiceInfo: serv,
+			Statuses:    connStatuses,
+		})
+	}
+
+	return statuses, nil
 }

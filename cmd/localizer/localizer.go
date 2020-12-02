@@ -21,8 +21,10 @@ import (
 	"os"
 	"os/signal"
 	"os/user"
+	"sort"
 	"strings"
 	"syscall"
+	"text/tabwriter"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -129,6 +131,44 @@ func main() { //nolint:funlen,gocyclo
 			},
 		},
 		Commands: []*cli.Command{
+			{
+				Name:        "list",
+				Description: "list all port-forwarded services and their status(es)",
+				Usage:       "list",
+				Action: func(c *cli.Context) error {
+					if _, err := os.Stat(server.SocketPath); os.IsNotExist(err) {
+						return fmt.Errorf("localizer daemon not running (run localizer by itself?)")
+					}
+
+					ctx, _ = context.WithTimeout(ctx, 30*time.Second) //nolint:lostcancel
+
+					conn, err := grpc.DialContext(ctx, "unix://"+server.SocketPath,
+						grpc.WithBlock(), grpc.WithInsecure())
+					if err != nil {
+						return errors.Wrap(err, "failed to talk to localizer daemon")
+					}
+
+					cli := apiv1.NewLocalizerServiceClient(conn)
+
+					resp, err := cli.List(ctx, &apiv1.ListRequest{})
+					if err != nil {
+						return err
+					}
+
+					w := tabwriter.NewWriter(os.Stdout, 10, 0, 5, ' ', 0)
+					defer w.Flush()
+
+					fmt.Fprintf(w, "NAMESPACE\tNAME\tSTATUS\t\n")
+					sort.Slice(resp.Services, func(i, j int) bool {
+						return resp.Services[i].Namespace < resp.Services[j].Namespace
+					})
+					for _, s := range resp.Services {
+						fmt.Fprintf(w, "%s\t%s\t%s\t\n", s.Namespace, s.Name, strings.ToUpper(s.Status[:1])+s.Status[1:])
+					}
+
+					return nil
+				},
+			},
 			{
 				Name:        "expose",
 				Description: "Expose ports for a given service to Kubernetes",

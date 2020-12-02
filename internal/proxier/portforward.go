@@ -18,6 +18,8 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"os/exec"
+	"runtime"
 	"strconv"
 	"time"
 
@@ -56,22 +58,22 @@ type worker struct {
 // NewPortForwarder creates a new port-forward worker that handles
 // creating port-forwards and destroying port-forwards.
 //nolint:gocritic,lll // We're OK not naming these.
-func NewPortForwarder(ctx context.Context, k kubernetes.Interface, r *rest.Config, log logrus.FieldLogger) (chan<- PortForwardRequest, <-chan struct{}, error) {
+func NewPortForwarder(ctx context.Context, k kubernetes.Interface, r *rest.Config, log logrus.FieldLogger) (chan<- PortForwardRequest, <-chan struct{}, *worker, error) {
 	ipamInstance := ipam.New()
 	prefix, err := ipamInstance.NewPrefix("127.0.0.1/8")
 	if err != nil {
-		return nil, nil, errors.Wrap(err, "failed to create ip pool")
+		return nil, nil, nil, errors.Wrap(err, "failed to create ip pool")
 	}
 
 	// ensure that 127.0.0.1 is never allocated
 	_, err = ipamInstance.AcquireSpecificIP(prefix.Cidr, "127.0.0.1")
 	if err != nil {
-		return nil, nil, errors.Wrap(err, "failed to create ip pool")
+		return nil, nil, nil, errors.Wrap(err, "failed to create ip pool")
 	}
 
 	hosts, err := txeh.NewHosts(&txeh.HostsConfig{})
 	if err != nil {
-		return nil, nil, errors.Wrap(err, "failed to open up hosts file for r/w")
+		return nil, nil, nil, errors.Wrap(err, "failed to open up hosts file for r/w")
 	}
 
 	doneChan := make(chan struct{})
@@ -106,7 +108,7 @@ func NewPortForwarder(ctx context.Context, k kubernetes.Interface, r *rest.Confi
 	go w.Reaper(ctx)
 	go w.Start(ctx)
 
-	return reqChan, doneChan, nil
+	return reqChan, doneChan, w, nil
 }
 
 // Repear reaps dead connections based off of endpoint updates
@@ -118,14 +120,26 @@ func (w *worker) Reaper(ctx context.Context) {
 		case endpoints := <-w.reaperChan:
 			// check if we care about this endpoint by checking if it's
 			// part of our registered services
-			conns, ok := w.portForwards[ServiceInfo{endpoints.Name, endpoints.Namespace}]
+			serv, err := w.k.CoreV1().Services(endpoints.Namespace).Get(ctx, endpoints.Name, metav1.GetOptions{})
+			if err != nil {
+				w.log.WithError(err).Warn("failed to process endpoint update")
+				continue
+			}
+
+			// TODO: This is really bad, and will result in a lot of calls.
+			// Instead use informer cache and expose fn to get this in handlers
+			servType := ServiceTypeStandard
+			if serv.Spec.ClusterIP == "None" {
+				servType = ServiceTypeStatefulset
+			}
+
+			servInfo := ServiceInfo{serv.Name, serv.Namespace, servType}
+			conns, ok := w.portForwards[servInfo]
 			if !ok {
 				continue
 			}
 
-			found := false
-			var conn *PortForwardConnection
-		loop:
+			foundPods := make(map[PodInfo]bool)
 			for _, subset := range endpoints.Subsets {
 				for _, addr := range subset.Addresses {
 					if addr.TargetRef == nil {
@@ -136,30 +150,27 @@ func (w *worker) Reaper(ctx context.Context) {
 						continue
 					}
 
-					pod := PodInfo{addr.TargetRef.Name, addr.TargetRef.Namespace}
-					for i := range conns {
-						c := &conns[i]
-						if c.Pod == pod {
-							found = true
-							conn = c
-							break loop
-						}
-					}
+					foundPods[PodInfo{addr.TargetRef.Name, addr.TargetRef.Namespace}] = true
 				}
-			}
-			if found {
-				continue
 			}
 
 			// reap connection, pod we had was no longer part of the endpoints
-			w.reqChan <- PortForwardRequest{
-				CreatePortForwardRequest: &CreatePortForwardRequest{
-					Service:        conn.Service,
-					Hostnames:      conn.Hostnames,
-					Ports:          conn.Ports,
-					Recreate:       true,
-					RecreateReason: "endpoint was removed",
-				},
+			for i := range conns {
+				c := &conns[i]
+				if _, ok := foundPods[c.Pod]; ok {
+					continue
+				}
+
+				// refresh pods we didn't find
+				w.reqChan <- PortForwardRequest{
+					CreatePortForwardRequest: &CreatePortForwardRequest{
+						Service:        c.Service,
+						Hostnames:      c.Hostnames,
+						Ports:          c.Ports,
+						Recreate:       true,
+						RecreateReason: "endpoint was removed",
+					},
+				}
 			}
 		}
 	}
@@ -183,11 +194,6 @@ func (w *worker) Start(ctx context.Context) {
 			close(w.doneChan)
 			return
 		case req := <-w.reqChan:
-			// TODO: When an error occurs we need to punt the request to some sort of
-			// back-off channel. We could probably make a small channel that has a worker
-			// that handles this for us.
-			// We also need to know if something is "recoverable" or not. We could probably
-			// make a "NewBackoffError()" helper to aide us in doing this
 			var serv ServiceInfo
 			var err error
 			if req.CreatePortForwardRequest != nil {
@@ -267,9 +273,17 @@ func (w *worker) CreatePortForward(ctx context.Context, req *CreatePortForwardRe
 		return errors.Wrap(err, "failed to allocate IP")
 	}
 
+	// We only need to create alias on darwin, on other platforms
+	// lo0 becomes lo and routes the full /8
+	if runtime.GOOS == "darwin" {
+		args := []string{"lo0", "alias", ipAddress.IP.String(), "up"}
+		if err := exec.Command("ifconfig", args...).Run(); err != nil {
+			return errors.Wrap(err, "failed to create ip link")
+		}
+	}
+
 	w.dns.AddHosts(ipAddress.IP.String(), req.Hostnames)
-	err = w.dns.Save()
-	if err != nil {
+	if err := w.dns.Save(); err != nil {
 		return errors.Wrap(err, "failed to save DNS changes")
 	}
 
@@ -284,9 +298,12 @@ func (w *worker) CreatePortForward(ctx context.Context, req *CreatePortForwardRe
 		return errors.Wrap(err, "failed to upgrade connection")
 	}
 
-	pod, err := w.getPodForService(ctx, &req.Service)
-	if err != nil {
-		return err
+	var pod PodInfo
+	if req.Endpoint == nil {
+		pod, err = w.getPodForService(ctx, &req.Service)
+		if err != nil {
+			return err
+		}
 	}
 
 	dialer := spdy.NewDialer(upgrader, &http.Client{Transport: transport}, "POST", w.k.CoreV1().RESTClient().Post().
@@ -300,27 +317,6 @@ func (w *worker) CreatePortForward(ctx context.Context, req *CreatePortForwardRe
 		return errors.Wrap(err, "failed to create port-forward")
 	}
 
-	go func() {
-		err := fw.ForwardPorts()
-
-		// if context was canceled (exiting) then we can ignore the error
-		select {
-		case <-ctx.Done():
-			return
-		default:
-		}
-
-		w.reqChan <- PortForwardRequest{
-			CreatePortForwardRequest: &CreatePortForwardRequest{
-				Service:        req.Service,
-				Hostnames:      req.Hostnames,
-				Ports:          req.Ports,
-				Recreate:       true,
-				RecreateReason: fmt.Sprintf("%v", err),
-			},
-		}
-	}()
-
 	// mark that this is allocated
 	w.portForwards[req.Service] = append(w.portForwards[req.Service], PortForwardConnection{
 		Service:   req.Service,
@@ -331,6 +327,28 @@ func (w *worker) CreatePortForward(ctx context.Context, req *CreatePortForwardRe
 		Ports:     req.Ports,
 		pf:        fw,
 	})
+
+	go func() {
+		err := fw.ForwardPorts()
+
+		// if context was canceled (exiting) then we can ignore the error
+		select {
+		case <-ctx.Done():
+			return
+		default:
+		}
+
+		// otherwise, recreate it
+		w.reqChan <- PortForwardRequest{
+			CreatePortForwardRequest: &CreatePortForwardRequest{
+				Service:        req.Service,
+				Hostnames:      req.Hostnames,
+				Ports:          req.Ports,
+				Recreate:       true,
+				RecreateReason: fmt.Sprintf("%v", err),
+			},
+		}
+	}()
 
 	return nil
 }
@@ -354,6 +372,16 @@ func (w *worker) stopPortForward(_ context.Context, si ServiceInfo) error {
 		err := w.ippool.ReleaseIPFromPrefix(w.ipCidr, conn.IP.String())
 		if err != nil {
 			return errors.Wrap(err, "failed to free ip address")
+		}
+
+		// If we are on a platform that needs aliases
+		// then we need to remove it
+		if runtime.GOOS == "darwin" {
+			ipStr := conn.IP.String()
+			args := []string{"lo0", "-alias", ipStr}
+			if err := exec.Command("ifconfig", args...).Run(); err != nil {
+				return errors.Wrapf(err, "failed to remove ip alias '%s'", ipStr)
+			}
 		}
 
 		w.dns.RemoveHosts(conn.Hostnames)

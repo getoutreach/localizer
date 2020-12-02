@@ -207,8 +207,12 @@ func (p *ServiceForward) createTransport(ctx context.Context, po *corev1.Pod, lo
 
 	//nolint:errcheck
 	go func() {
+<<<<<<< HEAD
 		err := fw.ForwardPorts()
 		p.c.log.WithField("pod", po.Namespace+"/"+po.Name).WithError(err).Warn("underlying transport for ssh tunnel died, this requires a restart")
+=======
+		p.c.log.WithError(fw.ForwardPorts()).Info("ssh tunnel transport exited")
+>>>>>>> chore: stash changes
 	}()
 
 	p.c.log.Debug("waiting for transport to be marked as ready")
