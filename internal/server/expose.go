@@ -86,6 +86,8 @@ type Exposer struct {
 
 // NewExposer creates a service that can maintain multiple expose instances
 func NewExposer(parentCtx context.Context, k kubernetes.Interface, kconf *rest.Config, log logrus.FieldLogger) (*Exposer, error) {
+	log = log.WithField("component", "exposer")
+
 	e := expose.NewExposer(k, kconf, log)
 	if err := e.Start(parentCtx); err != nil {
 		return nil, err
@@ -112,7 +114,7 @@ func getKey(namespace, serviceName string) string {
 }
 
 func (e *Exposer) worker() { //nolint:lostcancel
-	// when this exits we're essentially done
+	// when this exits we're done
 	defer close(e.doneChan)
 
 	wg := sync.WaitGroup{}
@@ -123,6 +125,7 @@ func (e *Exposer) worker() { //nolint:lostcancel
 
 			// wait for the connections to close
 			wg.Wait()
+			e.log.Info("expose instances finished")
 
 			return
 		case expMsg := <-e.workerChan:
@@ -194,7 +197,7 @@ func (e *Exposer) Start(ports []kube.ResolvedServicePort, namespace, serviceName
 		serviceName: serviceName,
 	}
 
-	// TODO: propegate error
+	// TODO: propregate error
 	return nil
 }
 

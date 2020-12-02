@@ -140,7 +140,7 @@ func main() { //nolint:funlen,gocyclo
 						return fmt.Errorf("localizer daemon not running (run localizer by itself?)")
 					}
 
-					ctx, _ = context.WithTimeout(ctx, 30*time.Second) //nolint:lostcancel
+					ctx, cancel = context.WithTimeout(ctx, 30*time.Second)
 
 					conn, err := grpc.DialContext(ctx, "unix://"+server.SocketPath,
 						grpc.WithBlock(), grpc.WithInsecure())

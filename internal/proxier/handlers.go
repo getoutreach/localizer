@@ -18,7 +18,6 @@ import (
 	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 )
 
@@ -38,17 +37,19 @@ type ServiceEvent struct {
 // of our types. These then communicate with a port-forward
 // worker to create Kubernetes port-forwards.
 //nolint:gocritic // We're OK not naming these.
-func CreateHandlers(ctx context.Context, requester chan<- PortForwardRequest, k kubernetes.Interface) (chan<- ServiceEvent, <-chan struct{}) {
+func CreateHandlers(ctx context.Context, requester chan<- PortForwardRequest,
+	_ kubernetes.Interface) (chan<- ServiceEvent, <-chan struct{}) {
 	serviceChan := make(chan ServiceEvent)
 	doneChan := make(chan struct{})
 
-	go serviceProcessor(ctx, serviceChan, doneChan, requester, k)
+	go serviceProcessor(ctx, serviceChan, doneChan, requester)
 
 	return serviceChan, doneChan
 }
 
 // Services
-func serviceProcessor(ctx context.Context, event <-chan ServiceEvent, doneChan chan struct{}, requester chan<- PortForwardRequest, k kubernetes.Interface) {
+func serviceProcessor(ctx context.Context, event <-chan ServiceEvent,
+	doneChan chan struct{}, requester chan<- PortForwardRequest) {
 	for {
 		select {
 		case <-ctx.Done():
@@ -63,6 +64,11 @@ func serviceProcessor(ctx context.Context, event <-chan ServiceEvent, doneChan c
 
 			// Skip this service for now.
 			if info.Name == "kubernetes" {
+				continue
+			}
+
+			if s.Service.Spec.ExternalName != "" {
+				// skip ExternalName services
 				continue
 			}
 
@@ -93,38 +99,21 @@ func serviceProcessor(ctx context.Context, event <-chan ServiceEvent, doneChan c
 						},
 					}
 				case ServiceTypeStatefulset:
-					endpoints, err := k.CoreV1().Endpoints(info.Namespace).Get(ctx, info.Name, metav1.GetOptions{})
-					if err != nil {
-						// TODO: expose error
-						continue
-					}
-
-					for _, addresses := range endpoints.Subsets {
-						for _, e := range addresses.Addresses {
-							if e.TargetRef == nil {
-								continue
-							}
-
-							if e.TargetRef.Kind != "Pod" {
-								continue
-							}
-
-							name := fmt.Sprintf("%s.%s", e.TargetRef.Name, info.Name)
-							requester <- PortForwardRequest{
-								CreatePortForwardRequest: &CreatePortForwardRequest{
-									Service:  info,
-									Ports:    ports,
-									Endpoint: &PodInfo{e.TargetRef.Name, e.TargetRef.Namespace},
-									Hostnames: []string{
-										info.Name,
-										fmt.Sprintf("%s.%s", name, info.Namespace),
-										fmt.Sprintf("%s.%s.svc", name, info.Namespace),
-										fmt.Sprintf("%s.%s.svc.cluster", name, info.Namespace),
-										fmt.Sprintf("%s.%s.svc.cluster.local", name, info.Namespace),
-									},
-								},
-							}
-						}
+					// TODO: This doesn't support multiple pods for a service right now
+					// eventually we should support that.
+					name := fmt.Sprintf("%s.%s", info.Name+"-0", info.Name)
+					requester <- PortForwardRequest{
+						CreatePortForwardRequest: &CreatePortForwardRequest{
+							Service: info,
+							Ports:   ports,
+							Hostnames: []string{
+								name,
+								fmt.Sprintf("%s.%s", name, info.Namespace),
+								fmt.Sprintf("%s.%s.svc", name, info.Namespace),
+								fmt.Sprintf("%s.%s.svc.cluster", name, info.Namespace),
+								fmt.Sprintf("%s.%s.svc.cluster.local", name, info.Namespace),
+							},
+						},
 					}
 				}
 			case EventDeleted:

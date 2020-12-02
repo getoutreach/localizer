@@ -56,6 +56,7 @@ func NewProxier(ctx context.Context, k kubernetes.Interface, kconf *rest.Config,
 
 // Start starts the proxier
 func (p *Proxier) Start(ctx context.Context) error {
+	log := p.log.WithField("component", "proxier")
 	portForwarder, pfdoneChan, worker, err := NewPortForwarder(ctx, p.k, p.rest, p.log)
 	if err != nil {
 		return err
@@ -88,7 +89,10 @@ func (p *Proxier) Start(ctx context.Context) error {
 
 	go servInformer.Run(ctx.Done())
 
+	log.Info("waiting for kubernetes handlers to finish")
 	<-handlerDoneChan
+
+	log.Info("waiting for port-forward worker to finish")
 	<-pfdoneChan
 
 	return nil
@@ -101,14 +105,9 @@ func (p *Proxier) List(ctx context.Context) ([]ServiceStatus, error) {
 
 	statuses := make([]ServiceStatus, 0)
 	for serv := range p.worker.portForwards {
-		connStatuses := make([]PortForwardStatus, len(p.worker.portForwards[serv]))
-		for i := range p.worker.portForwards[serv] {
-			connStatuses[i] = p.worker.portForwards[serv][i].Status
-		}
-
 		statuses = append(statuses, ServiceStatus{
-			ServiceInfo: serv,
-			Statuses:    connStatuses,
+			ServiceInfo: p.worker.portForwards[serv].Service,
+			Statuses:    []PortForwardStatus{p.worker.portForwards[serv].Status},
 		})
 	}
 
