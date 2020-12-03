@@ -18,7 +18,10 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"os/user"
+	"strconv"
 
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
@@ -45,9 +48,27 @@ func (g *GRPCService) Run(ctx context.Context, log logrus.FieldLogger) error {
 
 	l, err := net.Listen("unix", SocketPath)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to listen on socket")
 	}
 	defer os.Remove(SocketPath)
+
+	// only allow users of docker group to access this socket
+	grp, err := user.LookupGroup("docker")
+	if err != nil {
+		return err
+	}
+	gid, err := strconv.Atoi(grp.Gid)
+	if err != nil {
+		return err
+	}
+	err = os.Chmod(SocketPath, 0660)
+	if err != nil {
+		return err
+	}
+	err = os.Chown(SocketPath, 0, gid)
+	if err != nil {
+		return err
+	}
 
 	g.lis = l
 
