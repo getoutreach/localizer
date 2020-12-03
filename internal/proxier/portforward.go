@@ -261,7 +261,7 @@ func (w *worker) CreatePortForward(ctx context.Context, req *CreatePortForwardRe
 
 	if req.Recreate {
 		log.Infof("recreating port-forward due to: %v", req.RecreateReason)
-		w.setPortForwardConnectionStatus(ctx, req.Service, PortForwardStatusRecreating)
+		w.setPortForwardConnectionStatus(ctx, req.Service, PortForwardStatusRecreating, req.RecreateReason)
 		err := w.stopPortForward(ctx, w.portForwards[serviceKey])
 		if err != nil {
 			log.WithError(err).Warn("failed to cleanup previous port-forward")
@@ -369,6 +369,8 @@ func (w *worker) CreatePortForward(ctx context.Context, req *CreatePortForwardRe
 		}()
 	} else {
 		log.Warn("skipping tunnel creation due to no endpoint being found")
+		pf.Status = PortForwardStatusDead
+		pf.StatusReason = "No endpoints were found."
 	}
 
 	// mark that this is allocated
@@ -377,7 +379,7 @@ func (w *worker) CreatePortForward(ctx context.Context, req *CreatePortForwardRe
 	return nil
 }
 
-func (w *worker) setPortForwardConnectionStatus(_ context.Context, si ServiceInfo, status PortForwardStatus) {
+func (w *worker) setPortForwardConnectionStatus(_ context.Context, si ServiceInfo, status PortForwardStatus, reason string) {
 	key := si.Key()
 	pf, ok := w.portForwards[key]
 	if !ok {
@@ -385,6 +387,7 @@ func (w *worker) setPortForwardConnectionStatus(_ context.Context, si ServiceInf
 	}
 
 	pf.Status = status
+	pf.StatusReason = reason
 	w.portForwards[key] = pf
 }
 

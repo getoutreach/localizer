@@ -38,11 +38,18 @@ type Proxier struct {
 type ServiceStatus struct {
 	ServiceInfo ServiceInfo
 
+	Endpoint PodInfo
+
 	// Statuses is dependent on the number of tunnels that exist for this
 	// connection. Generally this is one, since a service is usually one
-	// connection. However, if this is a statefulset, this will be equal
-	// to the number of pod.
+	// connection. Currently only one is supported, but in the future
+	// certain services will have more than one.
 	Statuses []PortForwardStatus
+
+	// Reason is the reason that this service is in this status.
+	// This is generally only set for services that are in a
+	// non-running state.
+	Reason string
 }
 
 // NewProxier creates a new proxier instance
@@ -105,9 +112,12 @@ func (p *Proxier) List(ctx context.Context) ([]ServiceStatus, error) {
 
 	statuses := make([]ServiceStatus, 0)
 	for serv := range p.worker.portForwards {
+		pf := p.worker.portForwards[serv]
 		statuses = append(statuses, ServiceStatus{
-			ServiceInfo: p.worker.portForwards[serv].Service,
-			Statuses:    []PortForwardStatus{p.worker.portForwards[serv].Status},
+			ServiceInfo: pf.Service,
+			Endpoint:    pf.Pod,
+			Reason:      pf.StatusReason,
+			Statuses:    []PortForwardStatus{pf.Status},
 		})
 	}
 

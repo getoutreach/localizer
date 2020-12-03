@@ -158,12 +158,12 @@ func main() { //nolint:funlen,gocyclo
 					w := tabwriter.NewWriter(os.Stdout, 10, 0, 5, ' ', 0)
 					defer w.Flush()
 
-					fmt.Fprintf(w, "NAMESPACE\tNAME\tSTATUS\t\n")
+					fmt.Fprintf(w, "NAMESPACE\tNAME\tSTATUS\tENDPOINT\tREASON\t\n")
 					sort.Slice(resp.Services, func(i, j int) bool {
 						return resp.Services[i].Namespace < resp.Services[j].Namespace
 					})
 					for _, s := range resp.Services {
-						fmt.Fprintf(w, "%s\t%s\t%s\t\n", s.Namespace, s.Name, strings.ToUpper(s.Status[:1])+s.Status[1:])
+						fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t\n", s.Namespace, s.Name, strings.ToUpper(s.Status[:1])+s.Status[1:], s.Endpoint, s.StatusReason)
 					}
 
 					return nil

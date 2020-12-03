@@ -94,9 +94,10 @@ type PortForwardRequest struct {
 // PortForwardConnection is a port-forward that is managed by the port-forward
 // worker.
 type PortForwardConnection struct {
-	Service ServiceInfo
-	Pod     PodInfo
-	Status  PortForwardStatus
+	Service      ServiceInfo
+	Pod          PodInfo
+	Status       PortForwardStatus
+	StatusReason string
 
 	// IP that this port-forward allocates
 	IP        net.IP

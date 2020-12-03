@@ -38,6 +38,8 @@ message ListService {
   string namespace = 1;
   string name = 2;
   string status = 3;
+  string endpoint = 4;
+  string status_reason = 5;
 }
 
 message ListResponse {
