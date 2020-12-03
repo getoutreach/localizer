@@ -369,7 +369,7 @@ func (w *worker) CreatePortForward(ctx context.Context, req *CreatePortForwardRe
 		}()
 	} else {
 		log.Warn("skipping tunnel creation due to no endpoint being found")
-		pf.Status = PortForwardStatusDead
+		pf.Status = PortForwardStatusWaiting
 		pf.StatusReason = "No endpoints were found."
 	}
 

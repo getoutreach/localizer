@@ -112,5 +112,5 @@ type PortForwardStatus string
 var (
 	PortForwardStatusRunning    PortForwardStatus = "running"
 	PortForwardStatusRecreating PortForwardStatus = "recreating"
-	PortForwardStatusDead       PortForwardStatus = "dead"
+	PortForwardStatusWaiting    PortForwardStatus = "waiting"
 )
