@@ -314,8 +314,11 @@ func (c *Client) Expose(ctx context.Context, ports []kube.ResolvedServicePort, n
 		objects = make(map[string]scaledObjectType)
 	}
 
+	log := c.log.WithField("service", fmt.Sprintf("%s/%s", namespace, serviceName))
+
 	return &ServiceForward{
 		c:           c,
+		log:         log,
 		ServiceName: serviceName,
 		Namespace:   namespace,
 		Selector:    s.Spec.Selector,

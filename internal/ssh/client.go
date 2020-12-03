@@ -81,6 +81,9 @@ func (c *Client) Start(ctx context.Context, serviceKey string) error {
 		Timeout: 10 * time.Second,
 	}
 
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
 	addr := fmt.Sprintf("%s:%d", c.host, c.port)
 	conn, err := dialer.DialContext(ctx, "tcp", addr)
 	if err != nil {
@@ -102,6 +105,30 @@ func (c *Client) Start(ctx context.Context, serviceKey string) error {
 
 	sshClient := ssh.NewClient(sconn, chans, reqs)
 	defer sshClient.Close()
+
+	// send keep-alive messages
+	// see: https://stackoverflow.com/questions/31554196/ssh-connection-timeout
+	go func() {
+		t := time.NewTicker(2 * time.Second)
+		defer t.Stop()
+
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-t.C:
+				c.log.Debug("sending ssh-keepalive")
+				_, _, err := sshClient.Conn.SendRequest("keepalive@golang.org", true, nil)
+				if err != nil {
+					c.log.WithError(err).Warn("failed to send keep-alive")
+
+					// recreate the connection
+					cancel()
+					return
+				}
+			}
+		}
+	}()
 
 	wg := sync.WaitGroup{}
 	for remotePort, localPort := range c.ports {
