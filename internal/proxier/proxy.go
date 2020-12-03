@@ -50,6 +50,12 @@ type ServiceStatus struct {
 	// This is generally only set for services that are in a
 	// non-running state.
 	Reason string
+
+	// IP is the IP address of this tunnel
+	IP string
+
+	// Ports are the ports this service is exposing
+	Ports []int
 }
 
 // NewProxier creates a new proxier instance
@@ -111,13 +117,19 @@ func (p *Proxier) List(ctx context.Context) ([]ServiceStatus, error) {
 	}
 
 	statuses := make([]ServiceStatus, 0)
-	for serv := range p.worker.portForwards {
-		pf := p.worker.portForwards[serv]
+	for _, pf := range p.worker.portForwards {
+		ip := pf.IP.String()
+		if len(pf.IP) == 0 {
+			ip = ""
+		}
+
 		statuses = append(statuses, ServiceStatus{
 			ServiceInfo: pf.Service,
 			Endpoint:    pf.Pod,
 			Reason:      pf.StatusReason,
 			Statuses:    []PortForwardStatus{pf.Status},
+			IP:          ip,
+			Ports:       pf.Ports,
 		})
 	}
 

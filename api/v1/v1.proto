@@ -40,6 +40,8 @@ message ListService {
   string status = 3;
   string endpoint = 4;
   string status_reason = 5;
+  string ip = 6;
+  repeated string ports = 7;
 }
 
 message ListResponse {

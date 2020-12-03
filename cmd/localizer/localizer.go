@@ -155,10 +155,10 @@ func main() { //nolint:funlen,gocyclo
 						return err
 					}
 
-					w := tabwriter.NewWriter(os.Stdout, 10, 0, 5, ' ', 0)
+					w := tabwriter.NewWriter(os.Stdout, 10, 0, 3, ' ', 0)
 					defer w.Flush()
 
-					fmt.Fprintf(w, "NAMESPACE\tNAME\tSTATUS\tREASON\tENDPOINT\t\n")
+					fmt.Fprintf(w, "NAMESPACE\tNAME\tSTATUS\tREASON\tENDPOINT\tIP ADDRESS\tPORT(S)\t\n")
 
 					// sort by namespace and then by name
 					sort.Slice(resp.Services, func(i, j int) bool {
@@ -169,7 +169,16 @@ func main() { //nolint:funlen,gocyclo
 					})
 
 					for _, s := range resp.Services {
-						fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t\n", s.Namespace, s.Name, strings.ToUpper(s.Status[:1])+s.Status[1:], s.StatusReason, s.Endpoint)
+						status := strings.ToUpper(s.Status[:1]) + s.Status[1:]
+						ip := s.Ip
+						if ip == "" {
+							ip = "None"
+						}
+
+						fmt.Fprintf(w,
+							"%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
+							s.Namespace, s.Name, status, s.StatusReason, s.Endpoint, ip, strings.Join(s.Ports, ","),
+						)
 					}
 
 					return nil

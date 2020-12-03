@@ -17,6 +17,7 @@ import (
 	"context"
 	"fmt"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"os/exec"
 	"runtime"
@@ -371,6 +372,9 @@ func (w *worker) CreatePortForward(ctx context.Context, req *CreatePortForwardRe
 		log.Warn("skipping tunnel creation due to no endpoint being found")
 		pf.Status = PortForwardStatusWaiting
 		pf.StatusReason = "No endpoints were found."
+		if err := w.stopPortForward(ctx, pf); err != nil {
+			return err
+		}
 	}
 
 	// mark that this is allocated
@@ -397,24 +401,28 @@ func (w *worker) stopPortForward(_ context.Context, conn *PortForwardConnection)
 	}
 
 	errs := make([]error, 0)
-	err := w.ippool.ReleaseIPFromPrefix(w.ipCidr, conn.IP.String())
-	if err != nil {
-		errs = append(errs, errors.Wrap(err, "failed to release ip address"))
-	}
+	if len(conn.IP) != 0 {
+		err := w.ippool.ReleaseIPFromPrefix(w.ipCidr, conn.IP.String())
+		if err != nil {
+			errs = append(errs, errors.Wrap(err, "failed to release ip address"))
+		} else {
+			// if we removed it, then mark it as unallocated
+			conn.IP = net.IP{}
+		}
 
-	// If we are on a platform that needs aliases
-	// then we need to remove it
-	if runtime.GOOS == "darwin" {
-		ipStr := conn.IP.String()
-		args := []string{"lo0", "-alias", ipStr}
-		if err := exec.Command("ifconfig", args...).Run(); err != nil {
-			errs = append(errs, errors.Wrap(err, "failed to release ip alias"))
+		// If we are on a platform that needs aliases
+		// then we need to remove it
+		if runtime.GOOS == "darwin" {
+			ipStr := conn.IP.String()
+			args := []string{"lo0", "-alias", ipStr}
+			if err := exec.Command("ifconfig", args...).Run(); err != nil {
+				errs = append(errs, errors.Wrap(err, "failed to release ip alias"))
+			}
 		}
 	}
 
 	w.dns.RemoveHosts(conn.Hostnames)
-	err = w.dns.Save()
-	if err != nil {
+	if err := w.dns.Save(); err != nil {
 		errs = append(errs, errors.Wrap(err, "failed to remove hosts entry"))
 	}
 

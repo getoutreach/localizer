@@ -15,6 +15,7 @@ package server
 
 import (
 	"context"
+	"fmt"
 
 	apiv1 "github.com/jaredallard/localizer/api/v1"
 )
@@ -28,12 +29,20 @@ func (h *GRPCServiceHandler) List(ctx context.Context, req *apiv1.ListRequest) (
 	services := make([]*apiv1.ListService, len(statuses))
 	for i := range statuses {
 		s := &statuses[i]
+
+		ports := make([]string, len(s.Ports))
+		for i, p := range s.Ports {
+			ports[i] = fmt.Sprintf("%d/tcp", p)
+		}
+
 		services[i] = &apiv1.ListService{
 			Namespace:    s.ServiceInfo.Namespace,
 			Name:         s.ServiceInfo.Name,
 			Endpoint:     s.Endpoint.Name,
 			StatusReason: s.Reason,
 			Status:       string(s.Statuses[0]),
+			Ip:           s.IP,
+			Ports:        ports,
 		}
 	}
 
