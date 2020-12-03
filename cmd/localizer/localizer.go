@@ -256,14 +256,18 @@ func main() { //nolint:funlen,gocyclo
 				return errors.Wrap(err, "failed to get current user")
 			}
 
-			if u.Uid != "0" {
-				return fmt.Errorf("must be run as root/Administrator")
+			// only require sudo on server mode
+			if c.Args().First() == "" {
+				if u.Uid != "0" {
+					return fmt.Errorf("must be run as root/Administrator")
+				}
 			}
 
 			sigC := make(chan os.Signal)
 			signal.Notify(sigC, os.Interrupt, syscall.SIGTERM)
 			go func() {
-				<-sigC
+				sig := <-sigC
+				log.WithField("signal", sig.String()).Info("shutting down")
 				cancel()
 			}()
 

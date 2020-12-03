@@ -76,6 +76,7 @@ func serviceProcessor(ctx context.Context, event <-chan ServiceEvent,
 				info.Type = ServiceTypeStatefulset
 			}
 
+			var msg PortForwardRequest
 			switch s.EventType {
 			case EventAdded:
 				ports := make([]int, len(s.Service.Spec.Ports))
@@ -85,7 +86,7 @@ func serviceProcessor(ctx context.Context, event <-chan ServiceEvent,
 
 				switch info.Type {
 				case ServiceTypeStandard:
-					requester <- PortForwardRequest{
+					msg = PortForwardRequest{
 						CreatePortForwardRequest: &CreatePortForwardRequest{
 							Service: info,
 							Ports:   ports,
@@ -102,7 +103,7 @@ func serviceProcessor(ctx context.Context, event <-chan ServiceEvent,
 					// TODO: This doesn't support multiple pods for a service right now
 					// eventually we should support that.
 					name := fmt.Sprintf("%s.%s", info.Name+"-0", info.Name)
-					requester <- PortForwardRequest{
+					msg = PortForwardRequest{
 						CreatePortForwardRequest: &CreatePortForwardRequest{
 							Service: info,
 							Ports:   ports,
@@ -122,6 +123,14 @@ func serviceProcessor(ctx context.Context, event <-chan ServiceEvent,
 						Service: info,
 					},
 				}
+			}
+
+			// send the message we generatedl, but check if the context has been canceled first
+			select {
+			case <-ctx.Done():
+				return
+			default:
+				requester <- msg
 			}
 		}
 	}

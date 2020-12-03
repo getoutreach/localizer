@@ -1,2 +1,2 @@
 #!/usr/bin/env bash
-exec sudo -E dlv --only-same-user=false "$@"
+exec sudo -E "$(command -v dlv)" --only-same-user=false "$@"

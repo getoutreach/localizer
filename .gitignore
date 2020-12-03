@@ -21,3 +21,6 @@ replacements/
 
 # Build stuff
 dist/
+
+# debugger
+__debug_bin

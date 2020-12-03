@@ -77,7 +77,7 @@ func NewPortForwarder(ctx context.Context, k kubernetes.Interface, r *rest.Confi
 	}
 
 	doneChan := make(chan struct{})
-	reqChan := make(chan PortForwardRequest)
+	reqChan := make(chan PortForwardRequest, 1024)
 	reaperChan := make(chan *corev1.Endpoints, 1024)
 
 	_, endpointInformer := cache.NewInformer(
@@ -187,7 +187,9 @@ func (w *worker) Start(ctx context.Context) {
 				}
 			}
 
+			// close our channel(s)
 			close(w.doneChan)
+
 			return
 		case req := <-w.reqChan:
 			var serv ServiceInfo
