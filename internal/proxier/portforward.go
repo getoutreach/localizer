@@ -402,22 +402,28 @@ func (w *worker) stopPortForward(_ context.Context, conn *PortForwardConnection)
 
 	errs := make([]error, 0)
 	if len(conn.IP) != 0 {
-		err := w.ippool.ReleaseIPFromPrefix(w.ipCidr, conn.IP.String())
-		if err != nil {
-			errs = append(errs, errors.Wrap(err, "failed to release ip address"))
-		} else {
-			// if we removed it, then mark it as unallocated
-			conn.IP = net.IP{}
-		}
-
 		// If we are on a platform that needs aliases
 		// then we need to remove it
 		if runtime.GOOS == "darwin" {
 			ipStr := conn.IP.String()
 			args := []string{"lo0", "-alias", ipStr}
-			if b, err := exec.Command("ifconfig", args...).Output(); err != nil {
-				errs = append(errs, errors.Wrapf(err, "failed to release ip alias: %v", string(b)))
+			if err := exec.Command("ifconfig", args...).Run(); err != nil {
+				message := ""
+				if exitError, ok := err.(*exec.ExitError); ok {
+					message = string(exitError.Stderr)
+				}
+				errs = append(errs, errors.Wrapf(err, "failed to release ip alias: %s", message))
 			}
+		}
+
+		err := w.ippool.ReleaseIPFromPrefix(w.ipCidr, conn.IP.String())
+		if err != nil {
+			errs = append(errs, errors.Wrap(err, "failed to release ip address"))
+		}
+
+		if len(errs) > 0 {
+			// mark as unallocated if it didn't fail to be removed
+			conn.IP = net.IP{}
 		}
 	}
 
