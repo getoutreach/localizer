@@ -401,7 +401,7 @@ func (w *worker) stopPortForward(_ context.Context, conn *PortForwardConnection)
 	}
 
 	errs := make([]error, 0)
-	if len(conn.IP) != 0 {
+	if len(conn.IP) > 0 {
 		// If we are on a platform that needs aliases
 		// then we need to remove it
 		if runtime.GOOS == "darwin" {
@@ -421,10 +421,7 @@ func (w *worker) stopPortForward(_ context.Context, conn *PortForwardConnection)
 			errs = append(errs, errors.Wrap(err, "failed to release ip address"))
 		}
 
-		if len(errs) > 0 {
-			// mark as unallocated if it didn't fail to be removed
-			conn.IP = net.IP{}
-		}
+		conn.IP = net.IP{}
 	}
 
 	w.dns.RemoveHosts(conn.Hostnames)
