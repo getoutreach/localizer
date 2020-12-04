@@ -415,8 +415,8 @@ func (w *worker) stopPortForward(_ context.Context, conn *PortForwardConnection)
 		if runtime.GOOS == "darwin" {
 			ipStr := conn.IP.String()
 			args := []string{"lo0", "-alias", ipStr}
-			if err := exec.Command("ifconfig", args...).Run(); err != nil {
-				errs = append(errs, errors.Wrap(err, "failed to release ip alias"))
+			if b, err := exec.Command("ifconfig", args...).Output(); err != nil {
+				errs = append(errs, errors.Wrapf(err, "failed to release ip alias: %v", string(b)))
 			}
 		}
 	}

@@ -18,8 +18,6 @@ import (
 	"fmt"
 	"net"
 	"os"
-	"os/user"
-	"strconv"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -52,20 +50,7 @@ func (g *GRPCService) Run(ctx context.Context, log logrus.FieldLogger) error {
 	}
 	defer os.Remove(SocketPath)
 
-	// only allow users of docker group to access this socket
-	grp, err := user.LookupGroup("docker")
-	if err != nil {
-		return err
-	}
-	gid, err := strconv.Atoi(grp.Gid)
-	if err != nil {
-		return err
-	}
-	err = os.Chmod(SocketPath, 0660)
-	if err != nil {
-		return err
-	}
-	err = os.Chown(SocketPath, 0, gid)
+	err = os.Chmod(SocketPath, 0777)
 	if err != nil {
 		return err
 	}
