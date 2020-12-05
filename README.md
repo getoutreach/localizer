@@ -52,7 +52,7 @@ Or manually download a release from [Github Releases](../../releases/latest) and
 Easy, just run the following:
 
 ```
-$ sudo localizer
+$ sudo -E localizer
 ```
 
 This will attempt to proxy all services in Kubernetes to your local machine under their respective ports.
