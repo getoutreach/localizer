@@ -38,9 +38,18 @@ When running `localizer expose <serviceName>` your local machine will look for a
 Kubernetes cluster, and if it exists it will create a container that will proxy traffic sent to it to your local machine
 allowing remote resources to access your local machine as if they were also running locally.
 
+## Install `localizer`
+
+You can install the (OSX/LINUX) binary directly into /usr/local/bin:
+```
+$ curl -Ls https://github.com/jaredallard/localizer/releases/download/v1.1.1/localizer_1.1.1_$(uname)_amd64.tar.gz | tar  -xzC /usr/local/bin localizer
+```
+
+Or manually download a release from [Github Releases](../../releases/latest) and unpack it into your `PATH`.
+
 ## How do I run `localizer`?
 
-Easy, just download a release from [Github Releases](../../releases/latest) and run the following:
+Easy, just run the following:
 
 ```
 $ sudo -E localizer
