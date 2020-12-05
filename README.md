@@ -40,10 +40,10 @@ allowing remote resources to access your local machine as if they were also runn
 
 ## How do I run `localizer`?
 
-Easy, just download a release from [Github Releases](/releases) and run the following:
+Easy, just download a release from [Github Releases](../../releases/latest) and run the following:
 
 ```
-$ sudo localizer
+$ sudo -E localizer
 ```
 
 This will attempt to proxy all services in Kubernetes to your local machine under their respective ports.
