@@ -55,7 +55,7 @@ type ServiceStatus struct {
 	IP string
 
 	// Ports are the ports this service is exposing
-	Ports []int
+	Ports []string
 }
 
 // NewProxier creates a new proxier instance

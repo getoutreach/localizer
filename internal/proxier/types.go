@@ -67,7 +67,7 @@ type CreatePortForwardRequest struct {
 	Hostnames []string
 
 	// Ports are the ports this port-forward exposes
-	Ports []int
+	Ports []string
 
 	// Endpoint is the specific pod to use for this service.
 	Endpoint *PodInfo
@@ -102,7 +102,9 @@ type PortForwardConnection struct {
 	// IP that this port-forward allocates
 	IP        net.IP
 	Hostnames []string
-	Ports     []int
+
+	// Ports is a local -> remote port list
+	Ports []string
 
 	pf *portforward.PortForwarder
 }

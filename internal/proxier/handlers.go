@@ -17,6 +17,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/jaredallard/localizer/internal/kube"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes"
 )
@@ -38,18 +39,18 @@ type ServiceEvent struct {
 // worker to create Kubernetes port-forwards.
 //nolint:gocritic // We're OK not naming these.
 func CreateHandlers(ctx context.Context, requester chan<- PortForwardRequest,
-	_ kubernetes.Interface) (chan<- ServiceEvent, <-chan struct{}) {
+	k kubernetes.Interface) (chan<- ServiceEvent, <-chan struct{}) {
 	serviceChan := make(chan ServiceEvent)
 	doneChan := make(chan struct{})
 
-	go serviceProcessor(ctx, serviceChan, doneChan, requester)
+	go serviceProcessor(ctx, serviceChan, doneChan, requester, k)
 
 	return serviceChan, doneChan
 }
 
 // Services
 func serviceProcessor(ctx context.Context, event <-chan ServiceEvent,
-	doneChan chan struct{}, requester chan<- PortForwardRequest) {
+	doneChan chan struct{}, requester chan<- PortForwardRequest, k kubernetes.Interface) {
 	for {
 		select {
 		case <-ctx.Done():
@@ -79,9 +80,15 @@ func serviceProcessor(ctx context.Context, event <-chan ServiceEvent,
 			var msg PortForwardRequest
 			switch s.EventType {
 			case EventAdded:
-				ports := make([]int, len(s.Service.Spec.Ports))
-				for i, p := range s.Service.Spec.Ports {
-					ports[i] = int(p.Port)
+				// resolve the service ports using endpoints if possible.
+				resolvedPorts, _, err := kube.ResolveServicePorts(ctx, k, s.Service)
+				if err != nil {
+					continue
+				}
+
+				ports := make([]string, len(s.Service.Spec.Ports))
+				for i, p := range resolvedPorts {
+					ports[i] = fmt.Sprintf("%d:%d", p.Port, p.TargetPort.IntValue())
 				}
 
 				switch info.Type {

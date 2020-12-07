@@ -16,6 +16,7 @@ package server
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	apiv1 "github.com/jaredallard/localizer/api/v1"
 )
@@ -32,7 +33,18 @@ func (h *GRPCServiceHandler) List(ctx context.Context, req *apiv1.ListRequest) (
 
 		ports := make([]string, len(s.Ports))
 		for i, p := range s.Ports {
-			ports[i] = fmt.Sprintf("%d/tcp", p)
+			servicePorts := strings.Split(p, ":")
+			if len(servicePorts) != 2 {
+				continue
+			}
+
+			sourcePort := servicePorts[0]
+			destPort := servicePorts[1]
+			if sourcePort == destPort {
+				ports[i] = sourcePort + "/tcp"
+			} else {
+				ports[i] = fmt.Sprintf("%s->%s/tcp", sourcePort, destPort)
+			}
 		}
 
 		services[i] = &apiv1.ListService{

@@ -21,7 +21,6 @@ import (
 	"net/http"
 	"os/exec"
 	"runtime"
-	"strconv"
 	"time"
 
 	"github.com/metal-stack/go-ipam"
@@ -285,12 +284,6 @@ func (w *worker) CreatePortForward(ctx context.Context, req *CreatePortForwardRe
 		}
 	}()
 
-	ports := make([]string, len(req.Ports))
-	for i, p := range req.Ports {
-		portStr := strconv.Itoa(p)
-		ports[i] = portStr + ":" + portStr
-	}
-
 	// TODO: need to release on error
 	ipAddress, err := w.ippool.AcquireIP(w.ipCidr)
 	if err != nil {
@@ -341,7 +334,7 @@ func (w *worker) CreatePortForward(ctx context.Context, req *CreatePortForwardRe
 			Name(pod.Name).
 			SubResource("portforward").URL())
 
-		fw, err := portforward.NewOnAddresses(dialer, []string{ipAddress.IP.String()}, ports, ctx.Done(), nil, ioutil.Discard, ioutil.Discard)
+		fw, err := portforward.NewOnAddresses(dialer, []string{ipAddress.IP.String()}, req.Ports, ctx.Done(), nil, ioutil.Discard, ioutil.Discard)
 		if err != nil {
 			return errors.Wrap(err, "failed to create port-forward")
 		}
