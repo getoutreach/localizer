@@ -32,10 +32,19 @@ const SocketPath = "/var/run/localizer.sock"
 type GRPCService struct {
 	lis net.Listener
 	srv *grpc.Server
+
+	opts *RunOpts
 }
 
-func NewGRPCService() *GRPCService {
-	return &GRPCService{}
+type RunOpts struct {
+	ClusterDomain string
+	IPCidr        string
+}
+
+func NewGRPCService(opts *RunOpts) *GRPCService {
+	return &GRPCService{
+		opts: opts,
+	}
 }
 
 // Run starts a grpc server with the internal server handler
@@ -46,13 +55,18 @@ func (g *GRPCService) Run(ctx context.Context, log logrus.FieldLogger) error {
 
 	l, err := net.Listen("unix", SocketPath)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to listen on socket")
 	}
 	defer os.Remove(SocketPath)
 
+	err = os.Chmod(SocketPath, 0777)
+	if err != nil {
+		return err
+	}
+
 	g.lis = l
 
-	h, err := NewServiceHandler(ctx, log)
+	h, err := NewServiceHandler(ctx, log, g.opts)
 	if err != nil {
 		return err
 	}
@@ -70,14 +84,17 @@ func (g *GRPCService) Run(ctx context.Context, log logrus.FieldLogger) error {
 
 	// One day Serve() will accept a context?
 	log.Infof("starting GRPC server on '%s'", SocketPath)
-	if g.srv.Serve(g.lis) != nil {
-		return errors.Wrap(err, "unexpected grpc.Serve error")
+	go func() {
+		err := g.srv.Serve(g.lis)
+		if err != nil {
+			log.WithError(err).Error("grpc server exited")
+		}
+	}()
+
+	if err := h.p.Start(ctx); err != nil {
+		log.WithError(err).Error("failed to start proxy informers")
 	}
 
-	// wait for sub-processes to finish
-	if err := h.p.Wait(); err != nil {
-		log.WithError(err).Warn("failed to cleanup tunnels")
-	}
 	h.exp.Wait()
 
 	return nil

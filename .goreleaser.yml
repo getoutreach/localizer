@@ -11,6 +11,8 @@ builds:
   - main: ./cmd/localizer
     id: &name localizer
     binary: *name
+    ldflags:
+      - '-w -s -X "main.Version=v{{ .Version }}"'
     goos:
       - linux
       - darwin

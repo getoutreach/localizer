@@ -10,6 +10,8 @@ message ExposeServiceRequest {
   repeated string port_map = 3;
 }
 
+message ListRequest {}
+
 message StopExposeRequest {
   string namespace = 1;
   string service = 2;
@@ -32,7 +34,22 @@ message ConsoleResponse {
   string message = 2;
 }
 
+message ListService {
+  string namespace = 1;
+  string name = 2;
+  string status = 3;
+  string endpoint = 4;
+  string status_reason = 5;
+  string ip = 6;
+  repeated string ports = 7;
+}
+
+message ListResponse {
+  repeated ListService services = 1;
+}
+
 service LocalizerService {
   rpc ExposeService(ExposeServiceRequest) returns (stream ConsoleResponse) {}
   rpc StopExpose(StopExposeRequest) returns (stream ConsoleResponse) {}
+  rpc List(ListRequest) returns (ListResponse) {}
 }

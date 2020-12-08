@@ -15,21 +15,24 @@ package expose
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/jaredallard/localizer/internal/kube"
-	"github.com/jaredallard/localizer/internal/proxier"
 	"github.com/jaredallard/localizer/internal/ssh"
 	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/tools/portforward"
+)
+
+const (
+	ExposedPodLabel = "localizer.jaredallard.github.com/exposed"
 )
 
 var (
@@ -51,7 +54,8 @@ var (
 )
 
 type ServiceForward struct {
-	c *Client
+	c   *Client
+	log logrus.FieldLogger
 
 	ServiceName string
 	Namespace   string
@@ -93,15 +97,9 @@ func (p *ServiceForward) createServerPod(ctx context.Context) (func(), *corev1.P
 		containerPorts[i] = cp
 	}
 
-	// create a pod for our new expose service
-	exposedPortsJSON, err := json.Marshal(containerPorts)
-	if err != nil {
-		return func() {}, nil, err
-	}
-
 	// add a label for localizer pods
 	labels := map[string]string{
-		"localizer.jaredallard.github.com/exposed": "true",
+		ExposedPodLabel: "true",
 	}
 	for k, v := range p.Selector {
 		labels[k] = v
@@ -111,11 +109,7 @@ func (p *ServiceForward) createServerPod(ctx context.Context) (func(), *corev1.P
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace:    p.Namespace,
 			GenerateName: fmt.Sprintf("localizer-%s-", p.ServiceName),
-			Annotations: map[string]string{
-				proxier.ExposedAnnotation:          "true",
-				proxier.ExposedLocalPortAnnotation: string(exposedPortsJSON),
-			},
-			Labels: labels,
+			Labels:       labels,
 		},
 		Spec: corev1.PodSpec{
 			RestartPolicy: corev1.RestartPolicyOnFailure,
@@ -164,7 +158,7 @@ func (p *ServiceForward) createServerPod(ctx context.Context) (func(), *corev1.P
 			},
 		},
 	}
-	p.c.log.Debug(spew.Sdump(podObject))
+	p.log.Debug(spew.Sdump(podObject))
 
 	po, err := p.c.k.CoreV1().Pods(p.Namespace).Create(ctx, podObject, metav1.CreateOptions{})
 	if err != nil {
@@ -172,15 +166,15 @@ func (p *ServiceForward) createServerPod(ctx context.Context) (func(), *corev1.P
 	}
 
 	cleanupFn := func() {
-		p.c.log.Debug("cleaning up pod")
+		p.log.Debug("cleaning up pod")
 		// cleanup the pod
 		//nolint:errcheck
 		p.c.k.CoreV1().Pods(p.Namespace).Delete(context.Background(), po.Name, metav1.DeleteOptions{})
 	}
 
-	p.c.log.Infof("created pod %s", po.ObjectMeta.Name)
+	p.log.Infof("created pod %s", po.ObjectMeta.Name)
 
-	p.c.log.Info("waiting for remote pod to be ready ...")
+	p.log.Info("waiting for remote pod to be ready ...")
 	t := time.NewTicker(3 * time.Second)
 
 	for {
@@ -209,7 +203,8 @@ func (p *ServiceForward) createServerPod(ctx context.Context) (func(), *corev1.P
 	}
 }
 
-func (p *ServiceForward) createTransport(ctx context.Context, po *corev1.Pod, localPort int) (int, *portforward.PortForwarder, error) {
+func (p *ServiceForward) createTransport(ctx context.Context, po *corev1.Pod,
+	localPort int, errorChan chan<- error) (int, *portforward.PortForwarder, error) {
 	fw, err := p.createServerPortForward(ctx, po, localPort)
 	if err != nil {
 		return 0, nil, errors.Wrap(err, "failed to create tunnel for underlying transport")
@@ -217,13 +212,11 @@ func (p *ServiceForward) createTransport(ctx context.Context, po *corev1.Pod, lo
 
 	fw.Ready = make(chan struct{})
 
-	//nolint:errcheck
 	go func() {
-		err := fw.ForwardPorts()
-		p.c.log.WithField("pod", po.Namespace+"/"+po.Name).WithError(err).Warn("underlying transport for ssh tunnel died, this requires a restart")
+		errorChan <- fw.ForwardPorts()
 	}()
 
-	p.c.log.Debug("waiting for transport to be marked as ready")
+	p.log.Debug("waiting for transport to be marked as ready")
 	select {
 	case <-fw.Ready:
 	case <-time.After(time.Second * 10):
@@ -253,17 +246,17 @@ func (p *ServiceForward) createTransport(ctx context.Context, po *corev1.Pod, lo
 }
 
 // Start starts forwarding a service, this blocks
-func (p *ServiceForward) Start(ctx context.Context) error {
+func (p *ServiceForward) Start(ctx context.Context) error { //nolint:funlen
 	ports := make([]string, len(p.Ports))
 	for i, port := range p.Ports {
 		prt := int(port.TargetPort.IntVal)
 		ports[i] = fmt.Sprintf("%d:%d", port.MappedPort, prt)
-		p.c.log.Debugf("tunneling port %v", ports[i])
+		p.log.Debugf("tunneling port %v", ports[i])
 	}
 
 	// scale down the other resources that powered this service
 	for _, o := range p.objects {
-		p.c.log.Infof("scaling %s from %d -> 0", o.GetKey(), o.Replicas)
+		p.log.Infof("scaling %s from %d -> 0", o.GetKey(), o.Replicas)
 		if err := p.c.scaleObject(ctx, &o.ObjectReference, uint(0)); err != nil {
 			return errors.Wrap(err, "failed to scale down object")
 		}
@@ -271,9 +264,9 @@ func (p *ServiceForward) Start(ctx context.Context) error {
 	defer func() {
 		// scale back up the resources that powered this service
 		for _, o := range p.objects {
-			p.c.log.Infof("scaling %s from 0 -> %d", o.GetKey(), o.Replicas)
+			p.log.Infof("scaling %s from 0 -> %d", o.GetKey(), o.Replicas)
 			if err := p.c.scaleObject(context.Background(), &o.ObjectReference, o.Replicas); err != nil {
-				p.c.log.WithError(err).Warn("failed to scale back up object")
+				p.log.WithError(err).Warn("failed to scale back up object")
 			}
 		}
 	}()
@@ -286,15 +279,14 @@ func (p *ServiceForward) Start(ctx context.Context) error {
 	var fw *portforward.PortForwarder
 	go func() {
 		for {
-			var err error
 			select {
 			case <-ctx.Done():
 				return
 			default:
 				if lastErr == ErrNotInitialized {
-					p.c.log.Debug("creating tunnel connection")
+					p.log.Debug("creating tunnel connection")
 				} else {
-					p.c.log.WithError(err).Errorf("connection died, recreating tunnel connection")
+					p.log.WithError(lastErr).Errorf("connection died, recreating tunnel connection")
 				}
 
 				if lastErr != ErrNotInitialized {
@@ -312,32 +304,39 @@ func (p *ServiceForward) Start(ctx context.Context) error {
 				// clean up the old pod, if it exists
 				cleanupFn()
 
+				var err error
 				cleanupFn, po, err = p.createServerPod(ctx)
 				if err != nil {
-					p.c.log.WithError(err).Debug("failed to create pod")
+					p.log.WithError(err).Debug("failed to create pod")
 					lastErr = ErrUnderlyingTransportPodDestroyed
 					continue
 				}
 
-				localPort, fw, err = p.createTransport(ctx, po, 0)
+				errorChan := make(chan error)
+				localPort, fw, err = p.createTransport(ctx, po, 0, errorChan)
 				if err != nil {
 					if fw != nil {
 						fw.Close()
 					}
 
-					p.c.log.WithError(err).Debug("failed to recreate transport port-forward")
+					p.log.WithError(err).Debug("failed to recreate transport port-forward")
 					lastErr = ErrUnderlyingTransportDied
 					continue
 				}
 
-				cli := ssh.NewReverseTunnelClient(p.c.log, "127.0.0.1", localPort, ports)
-				err = cli.Start(ctx, p.ServiceName)
-				if err != nil {
-					p.c.log.WithError(err).Debug("failed to recreate transport")
-					lastErr = ErrUnderlyingTransportProtocolDied
-				} else {
-					p.c.log.WithError(err).Debug("transport died")
-					lastErr = ErrUnderlyingTransportDied
+				cli := ssh.NewReverseTunnelClient(p.log, "127.0.0.1", localPort, ports)
+				go func() {
+					errorChan <- cli.Start(ctx, p.ServiceName)
+				}()
+
+				// handle errors
+				// if we get an error or even a nil err then we should
+				// clean up
+				select {
+				case <-ctx.Done():
+				case err := <-errorChan:
+					p.log.WithError(err).Debug("transport died")
+					lastErr = err
 				}
 
 				// cleanup the port-forward if the above died
