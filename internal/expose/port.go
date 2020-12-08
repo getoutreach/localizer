@@ -31,6 +31,10 @@ import (
 	"k8s.io/client-go/tools/portforward"
 )
 
+const (
+	ExposedPodLabel = "localizer.jaredallard.github.com/exposed"
+)
+
 var (
 	// ErrUnderlyingTransportDied is triggered when the kubernetes port-forward loses
 	// connection. This results in the transport protocol dying as well.
@@ -95,7 +99,7 @@ func (p *ServiceForward) createServerPod(ctx context.Context) (func(), *corev1.P
 
 	// add a label for localizer pods
 	labels := map[string]string{
-		"localizer.jaredallard.github.com/exposed": "true",
+		ExposedPodLabel: "true",
 	}
 	for k, v := range p.Selector {
 		labels[k] = v

@@ -15,13 +15,13 @@ package kube
 
 import (
 	"context"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 
+	"github.com/jaredallard/localizer/internal/kevents"
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
-	kerrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/transport/spdy"
@@ -101,8 +101,18 @@ type ResolvedServicePort struct {
 // format. TargetPort's that have are named become their integer equivalents
 func ResolveServicePorts(ctx context.Context, k kubernetes.Interface,
 	s *corev1.Service) ([]ResolvedServicePort, bool, error) {
-	e, err := k.CoreV1().Endpoints(s.ObjectMeta.Namespace).Get(ctx, s.ObjectMeta.Name, metav1.GetOptions{})
-	if kerrors.IsNotFound(err) || len(e.Subsets) == 0 {
+	store := kevents.GlobalCache.GetStore(&corev1.Endpoints{})
+	if store == nil {
+		return nil, false, fmt.Errorf("endpoints store was empty")
+	}
+
+	obj, exists, err := store.GetByKey(s.Namespace + "/" + s.Name)
+	if err != nil {
+		return nil, false, errors.Wrap(err, "failed to get endpoints")
+	}
+
+	e := obj.(*corev1.Endpoints)
+	if !exists || len(e.Subsets) == 0 {
 		// if there are no endpoints, don't resolve, just return them
 		servicePorts := make([]ResolvedServicePort, len(s.Spec.Ports))
 		for i, sp := range s.Spec.Ports {
@@ -113,8 +123,6 @@ func ResolveServicePorts(ctx context.Context, k kubernetes.Interface,
 			}
 		}
 		return servicePorts, false, nil
-	} else if err != nil {
-		return nil, false, errors.Wrap(err, "failed to get endpoints")
 	}
 
 	servicePorts := make([]ResolvedServicePort, len(s.Spec.Ports))

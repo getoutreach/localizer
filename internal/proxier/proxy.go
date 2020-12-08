@@ -16,14 +16,13 @@ package proxier
 import (
 	"context"
 	"fmt"
-	"time"
 
+	"github.com/jaredallard/localizer/internal/kevents"
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/cache"
 )
 
 // Proxier handles creating an maintaining proxies to a remote
@@ -78,29 +77,25 @@ func (p *Proxier) Start(ctx context.Context) error {
 
 	serviceChan, handlerDoneChan := CreateHandlers(ctx, portForwarder, p.k)
 
-	_, servInformer := cache.NewInformer(
-		cache.NewListWatchFromClient(p.k.CoreV1().RESTClient(), "services", corev1.NamespaceAll, fields.Everything()),
-		&corev1.Service{},
-		time.Second*0,
-		cache.ResourceEventHandlerFuncs{
-			AddFunc: func(obj interface{}) {
-				p.log.Debug("got service add event")
-				serviceChan <- ServiceEvent{
-					EventType: EventAdded,
-					Service:   obj.(*corev1.Service),
-				}
-			},
-			DeleteFunc: func(obj interface{}) {
-				p.log.Debug("got service delete event")
-				serviceChan <- ServiceEvent{
-					EventType: EventDeleted,
-					Service:   obj.(*corev1.Service),
-				}
-			},
-		},
-	)
+	err = kevents.WaitForSync(ctx, kevents.GlobalCache.TrackObject("endpoints", &corev1.Endpoints{}))
+	if err != nil {
+		return errors.Wrap(err, "failed to sync endpoint cache")
+	}
 
-	go servInformer.Run(ctx.Done())
+	// Handle services being created, send them to the proxier
+	err = kevents.GlobalCache.Subscribe(ctx, "services", &corev1.Service{}, func(e kevents.Event) {
+		if e.Event == kevents.EventTypeUpdated {
+			return
+		}
+
+		serviceChan <- ServiceEvent{
+			EventType: e.Event,
+			Service:   e.NewObject.(*corev1.Service),
+		}
+	})
+	if err != nil {
+		return err
+	}
 
 	log.Info("waiting for kubernetes handlers to finish")
 	<-handlerDoneChan

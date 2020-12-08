@@ -21,21 +21,19 @@ import (
 	"net/http"
 	"os/exec"
 	"runtime"
-	"time"
 
+	"github.com/jaredallard/localizer/internal/kevents"
 	"github.com/metal-stack/go-ipam"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/txn2/txeh"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/portforward"
 	"k8s.io/client-go/transport/spdy"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/fields"
 )
 
 type worker struct {
@@ -48,7 +46,7 @@ type worker struct {
 	dns    *txeh.Hosts
 
 	reqChan    chan PortForwardRequest
-	reaperChan chan *corev1.Endpoints
+	reaperChan chan kevents.Event
 	doneChan   chan<- struct{}
 
 	// portForwards are existing port-forwards
@@ -78,18 +76,7 @@ func NewPortForwarder(ctx context.Context, k kubernetes.Interface, r *rest.Confi
 
 	doneChan := make(chan struct{})
 	reqChan := make(chan PortForwardRequest, 1024)
-	reaperChan := make(chan *corev1.Endpoints, 1024)
-
-	_, endpointInformer := cache.NewInformer(
-		cache.NewListWatchFromClient(k.CoreV1().RESTClient(), "endpoints", corev1.NamespaceAll, fields.Everything()),
-		&corev1.Endpoints{},
-		time.Second*60,
-		cache.ResourceEventHandlerFuncs{
-			UpdateFunc: func(_, obj interface{}) {
-				reaperChan <- obj.(*corev1.Endpoints)
-			},
-		},
-	)
+	reaperChan := make(chan kevents.Event, 1024)
 
 	w := &worker{
 		k:            k,
@@ -104,71 +91,69 @@ func NewPortForwarder(ctx context.Context, k kubernetes.Interface, r *rest.Confi
 		portForwards: make(map[string]*PortForwardConnection),
 	}
 
-	go endpointInformer.Run(ctx.Done())
-	go w.Reaper(ctx)
+	err = kevents.GlobalCache.Subscribe(ctx, "endpoints", &corev1.Endpoints{}, w.Reaper)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
 	go w.Start(ctx)
 
 	return reqChan, doneChan, w, nil
 }
 
 // Repear reaps dead connections based off of endpoint updates
-func (w *worker) Reaper(ctx context.Context) {
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case endpoints := <-w.reaperChan:
-			// check if we care about this endpoint by checking if it's
-			// part of our registered services
-			conns, ok := w.portForwards[(&ServiceInfo{endpoints.Name, endpoints.Namespace, ""}).Key()]
-			if !ok {
+func (w *worker) Reaper(e kevents.Event) {
+	endpoints := e.NewObject.(*corev1.Endpoints)
+
+	// check if we care about this endpoint by checking if it's
+	// part of our registered services
+	conns, ok := w.portForwards[(&ServiceInfo{endpoints.Name, endpoints.Namespace, ""}).Key()]
+	if !ok {
+		return
+	}
+
+	foundEndpoints := make(map[PodInfo]bool)
+	for _, subset := range endpoints.Subsets {
+		for _, addr := range subset.Addresses {
+			if addr.TargetRef == nil {
 				continue
 			}
 
-			foundEndpoints := make(map[PodInfo]bool)
-			for _, subset := range endpoints.Subsets {
-				for _, addr := range subset.Addresses {
-					if addr.TargetRef == nil {
-						continue
-					}
-
-					if addr.TargetRef.Kind != "Pod" {
-						continue
-					}
-
-					foundEndpoints[PodInfo{addr.TargetRef.Name, addr.TargetRef.Namespace}] = true
-				}
-			}
-
-			// endpoint still exists, so don't do anything
-			if _, ok := foundEndpoints[conns.Pod]; ok {
+			if addr.TargetRef.Kind != "Pod" {
 				continue
 			}
 
-			reason := fmt.Sprintf("endpoints '%s' was removed", conns.Pod.Key())
-
-			// handle a service that had no endpoints before, but now does
-			// TODO: use ptr
-			if conns.Pod.Key() == "/" {
-				if len(foundEndpoints) != 0 {
-					reason = "found endpoints, service originally had none"
-				} else {
-					// if no endpoints still, then ignore it
-					continue
-				}
-			}
-
-			// refresh pods we didn't find
-			w.reqChan <- PortForwardRequest{
-				CreatePortForwardRequest: &CreatePortForwardRequest{
-					Service:        conns.Service,
-					Hostnames:      conns.Hostnames,
-					Ports:          conns.Ports,
-					Recreate:       true,
-					RecreateReason: reason,
-				},
-			}
+			foundEndpoints[PodInfo{addr.TargetRef.Name, addr.TargetRef.Namespace}] = true
 		}
+	}
+
+	// endpoint still exists, so don't do anything
+	if _, ok := foundEndpoints[conns.Pod]; ok {
+		return
+	}
+
+	reason := fmt.Sprintf("endpoints '%s' was removed", conns.Pod.Key())
+
+	// handle a service that had no endpoints before, but now does
+	// TODO: use ptr
+	if conns.Pod.Key() == "/" {
+		if len(foundEndpoints) != 0 {
+			reason = "found endpoints, service originally had none"
+		} else {
+			// if no endpoints still, then ignore it
+			return
+		}
+	}
+
+	// refresh pods we didn't find
+	w.reqChan <- PortForwardRequest{
+		CreatePortForwardRequest: &CreatePortForwardRequest{
+			Service:        conns.Service,
+			Hostnames:      conns.Hostnames,
+			Ports:          conns.Ports,
+			Recreate:       true,
+			RecreateReason: reason,
+		},
 	}
 }
 

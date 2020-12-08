@@ -17,20 +17,14 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/jaredallard/localizer/internal/kevents"
 	"github.com/jaredallard/localizer/internal/kube"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes"
 )
 
-type EventType string
-
-var (
-	EventAdded   EventType = "added"
-	EventDeleted EventType = "deleted"
-)
-
 type ServiceEvent struct {
-	EventType EventType
+	EventType kevents.EventType
 	Service   *corev1.Service
 }
 
@@ -40,7 +34,7 @@ type ServiceEvent struct {
 //nolint:gocritic // We're OK not naming these.
 func CreateHandlers(ctx context.Context, requester chan<- PortForwardRequest,
 	k kubernetes.Interface) (chan<- ServiceEvent, <-chan struct{}) {
-	serviceChan := make(chan ServiceEvent)
+	serviceChan := make(chan ServiceEvent, 1024)
 	doneChan := make(chan struct{})
 
 	go serviceProcessor(ctx, serviceChan, doneChan, requester, k)
@@ -79,7 +73,7 @@ func serviceProcessor(ctx context.Context, event <-chan ServiceEvent,
 
 			var msg PortForwardRequest
 			switch s.EventType {
-			case EventAdded:
+			case kevents.EventTypeAdded:
 				// resolve the service ports using endpoints if possible.
 				resolvedPorts, _, err := kube.ResolveServicePorts(ctx, k, s.Service)
 				if err != nil {
@@ -124,12 +118,15 @@ func serviceProcessor(ctx context.Context, event <-chan ServiceEvent,
 						},
 					}
 				}
-			case EventDeleted:
+			case kevents.EventTypeDeleted:
 				requester <- PortForwardRequest{
 					DeletePortForwardRequest: &DeletePortForwardRequest{
 						Service: info,
 					},
 				}
+			case kevents.EventTypeUpdated:
+				// unused
+				continue
 			}
 
 			// send the message we generatedl, but check if the context has been canceled first

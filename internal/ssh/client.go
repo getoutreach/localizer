@@ -179,7 +179,7 @@ func (c *Client) handleReverseForwardConn(client net.Conn, localAddr string) {
 
 	remote, err := net.Dial("tcp", localAddr)
 	if err != nil {
-		c.log.WithError(err).Errorf("failed to dial local service")
+		c.log.WithError(err).Errorf("failed to dial local service. Is anyone there? :(")
 		return
 	}
 

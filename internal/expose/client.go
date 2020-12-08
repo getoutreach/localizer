@@ -80,6 +80,21 @@ func (c *Client) Start(ctx context.Context) error {
 		return fmt.Errorf("failed to populate pod/replicaset cache")
 	}
 
+	for _, obj := range podStore.List() {
+		p := obj.(*corev1.Pod)
+
+		if p.Labels[ExposedPodLabel] == "true" {
+			key, _ := cache.MetaNamespaceKeyFunc(p)
+			log := c.log.WithField("pod", key)
+			log.Warn("removing abandoned localizer pod")
+
+			err := c.k.CoreV1().Pods(p.Namespace).Delete(ctx, p.Name, metav1.DeleteOptions{})
+			if err != nil {
+				log.Warn("failed to remove abandoned localizer pod")
+			}
+		}
+	}
+
 	return nil
 }
 
