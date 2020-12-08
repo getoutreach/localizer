@@ -33,18 +33,18 @@ type ServiceEvent struct {
 // worker to create Kubernetes port-forwards.
 //nolint:gocritic // We're OK not naming these.
 func CreateHandlers(ctx context.Context, requester chan<- PortForwardRequest,
-	k kubernetes.Interface) (chan<- ServiceEvent, <-chan struct{}) {
+	k kubernetes.Interface, clusterDomain string) (chan<- ServiceEvent, <-chan struct{}) {
 	serviceChan := make(chan ServiceEvent, 1024)
 	doneChan := make(chan struct{})
 
-	go serviceProcessor(ctx, serviceChan, doneChan, requester, k)
+	go serviceProcessor(ctx, serviceChan, doneChan, requester, k, clusterDomain)
 
 	return serviceChan, doneChan
 }
 
 // Services
 func serviceProcessor(ctx context.Context, event <-chan ServiceEvent,
-	doneChan chan struct{}, requester chan<- PortForwardRequest, k kubernetes.Interface) {
+	doneChan chan struct{}, requester chan<- PortForwardRequest, k kubernetes.Interface, clusterDomain string) {
 	for {
 		select {
 		case <-ctx.Done():
@@ -95,8 +95,7 @@ func serviceProcessor(ctx context.Context, event <-chan ServiceEvent,
 								info.Name,
 								fmt.Sprintf("%s.%s", info.Name, info.Namespace),
 								fmt.Sprintf("%s.%s.svc", info.Name, info.Namespace),
-								fmt.Sprintf("%s.%s.svc.cluster", info.Name, info.Namespace),
-								fmt.Sprintf("%s.%s.svc.cluster.local", info.Name, info.Namespace),
+								fmt.Sprintf("%s.%s.svc.%s", info.Name, info.Namespace, clusterDomain),
 							},
 						},
 					}
@@ -112,8 +111,7 @@ func serviceProcessor(ctx context.Context, event <-chan ServiceEvent,
 								name,
 								fmt.Sprintf("%s.%s", name, info.Namespace),
 								fmt.Sprintf("%s.%s.svc", name, info.Namespace),
-								fmt.Sprintf("%s.%s.svc.cluster", name, info.Namespace),
-								fmt.Sprintf("%s.%s.svc.cluster.local", name, info.Namespace),
+								fmt.Sprintf("%s.%s.svc.%s", name, info.Namespace, clusterDomain),
 							},
 						},
 					}

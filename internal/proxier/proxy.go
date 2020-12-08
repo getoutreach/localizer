@@ -32,6 +32,8 @@ type Proxier struct {
 	rest   *rest.Config
 	log    logrus.FieldLogger
 	worker *worker
+
+	opts *ProxyOpts
 }
 
 type ServiceStatus struct {
@@ -57,25 +59,33 @@ type ServiceStatus struct {
 	Ports []string
 }
 
+type ProxyOpts struct {
+	ClusterDomain string
+	IPCidr        string
+}
+
 // NewProxier creates a new proxier instance
-func NewProxier(ctx context.Context, k kubernetes.Interface, kconf *rest.Config, log logrus.FieldLogger) *Proxier {
+func NewProxier(ctx context.Context, k kubernetes.Interface, kconf *rest.Config, log logrus.FieldLogger, opts *ProxyOpts) *Proxier {
 	return &Proxier{
 		k:    k,
 		rest: kconf,
 		log:  log,
+		opts: opts,
 	}
 }
 
 // Start starts the proxier
+// TODO: replace raw cluster domain with options struct, maybe also
+// move into NewProxier
 func (p *Proxier) Start(ctx context.Context) error {
 	log := p.log.WithField("component", "proxier")
-	portForwarder, pfdoneChan, worker, err := NewPortForwarder(ctx, p.k, p.rest, p.log)
+	portForwarder, pfdoneChan, worker, err := NewPortForwarder(ctx, p.k, p.rest, p.log, p.opts)
 	if err != nil {
 		return err
 	}
 	p.worker = worker
 
-	serviceChan, handlerDoneChan := CreateHandlers(ctx, portForwarder, p.k)
+	serviceChan, handlerDoneChan := CreateHandlers(ctx, portForwarder, p.k, p.opts.ClusterDomain)
 
 	err = kevents.WaitForSync(ctx, kevents.GlobalCache.TrackObject("endpoints", &corev1.Endpoints{}))
 	if err != nil {

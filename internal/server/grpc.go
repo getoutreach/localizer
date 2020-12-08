@@ -32,10 +32,19 @@ const SocketPath = "/var/run/localizer.sock"
 type GRPCService struct {
 	lis net.Listener
 	srv *grpc.Server
+
+	opts *RunOpts
 }
 
-func NewGRPCService() *GRPCService {
-	return &GRPCService{}
+type RunOpts struct {
+	ClusterDomain string
+	IPCidr        string
+}
+
+func NewGRPCService(opts *RunOpts) *GRPCService {
+	return &GRPCService{
+		opts: opts,
+	}
 }
 
 // Run starts a grpc server with the internal server handler
@@ -57,7 +66,7 @@ func (g *GRPCService) Run(ctx context.Context, log logrus.FieldLogger) error {
 
 	g.lis = l
 
-	h, err := NewServiceHandler(ctx, log)
+	h, err := NewServiceHandler(ctx, log, g.opts)
 	if err != nil {
 		return err
 	}

@@ -57,17 +57,25 @@ type worker struct {
 // creating port-forwards and destroying port-forwards.
 //nolint:gocritic,golint // We're OK not naming these.
 func NewPortForwarder(ctx context.Context, k kubernetes.Interface,
-	r *rest.Config, log logrus.FieldLogger) (chan<- PortForwardRequest, <-chan struct{}, *worker, error) {
+	r *rest.Config, log logrus.FieldLogger, opts *ProxyOpts) (chan<- PortForwardRequest, <-chan struct{}, *worker, error) {
 	ipamInstance := ipam.New()
-	prefix, err := ipamInstance.NewPrefix("127.0.0.1/8")
+
+	_, cidr, err := net.ParseCIDR(opts.IPCidr)
+	if err != nil {
+		return nil, nil, nil, errors.Wrap(err, "failed to parse provided cidr")
+	}
+
+	prefix, err := ipamInstance.NewPrefix(opts.IPCidr)
 	if err != nil {
 		return nil, nil, nil, errors.Wrap(err, "failed to create ip pool")
 	}
 
-	// ensure that 127.0.0.1 is never allocated
-	_, err = ipamInstance.AcquireSpecificIP(prefix.Cidr, "127.0.0.1")
-	if err != nil {
-		return nil, nil, nil, errors.Wrap(err, "failed to create ip pool")
+	defaultIP := "127.0.0.1"
+	if cidr.Contains(net.ParseIP(defaultIP)) {
+		_, err = ipamInstance.AcquireSpecificIP(prefix.Cidr, defaultIP)
+		if err != nil {
+			return nil, nil, nil, errors.Wrap(err, "failed to create ip pool")
+		}
 	}
 
 	hosts, err := txeh.NewHosts(&txeh.HostsConfig{})

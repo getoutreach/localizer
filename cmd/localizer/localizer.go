@@ -49,7 +49,6 @@ func main() { //nolint:funlen,gocyclo
 		defer tmpFile.Close()
 
 		log.Out = io.MultiWriter(os.Stderr, tmpFile)
-		log.Info("writing to file " + tmpFilePath)
 	}
 
 	// this prevents the CLI from clobbering context cancellation
@@ -84,6 +83,16 @@ func main() { //nolint:funlen,gocyclo
 				EnvVars:     []string{"LOG_FORMAT"},
 				DefaultText: "TEXT",
 			},
+			&cli.StringFlag{
+				Name:  "cluster-domain",
+				Usage: "Configure the cluster domain used for service DNS endpoints",
+				Value: "cluster.local",
+			},
+			&cli.StringFlag{
+				Name:  "ip-cidr",
+				Usage: "Set the IP address CIDR, must include the /",
+				Value: "127.0.0.1/8",
+			},
 		},
 		Commands: []*cli.Command{
 			NewListCommand(log),
@@ -106,12 +115,10 @@ func main() { //nolint:funlen,gocyclo
 
 			if strings.EqualFold(c.String("log-level"), "debug") {
 				log.SetLevel(logrus.DebugLevel)
-				log.Debug("set logger to debug")
 			}
 
 			if strings.EqualFold(c.String("log-format"), "JSON") {
 				log.SetFormatter(&logrus.JSONFormatter{})
-				log.Debug("set log format to JSON")
 			}
 
 			klog.SetLogger(&kube.KlogtoLogrus{Log: log.WithField("logger", "klog")})
@@ -135,7 +142,16 @@ func main() { //nolint:funlen,gocyclo
 				return fmt.Errorf("must be run as root/Administrator")
 			}
 
-			srv := server.NewGRPCService()
+			clusterDomain := c.String("cluster-domain")
+			ipCidr := c.String("ip-cidr")
+
+			log.Infof("using cluster domain: %v", clusterDomain)
+			log.Infof("using ip cidr: %v", ipCidr)
+
+			srv := server.NewGRPCService(&server.RunOpts{
+				ClusterDomain: clusterDomain,
+				IPCidr:        ipCidr,
+			})
 			return srv.Run(ctx, log)
 		},
 	}

@@ -47,7 +47,7 @@ type GRPCServiceHandler struct {
 ///StartBlock(global)
 ///EndBlock(global)
 
-func NewServiceHandler(ctx context.Context, log logrus.FieldLogger) (*GRPCServiceHandler, error) {
+func NewServiceHandler(ctx context.Context, log logrus.FieldLogger, opts *RunOpts) (*GRPCServiceHandler, error) {
 	///StartBlock(grpcInit)
 	log = log.WithField("service", "*api.GRPCServiceHandler")
 
@@ -62,7 +62,10 @@ func NewServiceHandler(ctx context.Context, log logrus.FieldLogger) (*GRPCServic
 		return nil, errors.Wrap(err, "failed to start expose container")
 	}
 
-	p := proxier.NewProxier(ctx, k, kconf, log)
+	p := proxier.NewProxier(ctx, k, kconf, log, &proxier.ProxyOpts{
+		ClusterDomain: opts.ClusterDomain,
+		IPCidr:        opts.IPCidr,
+	})
 	///EndBlock(grpcInit)
 
 	return &GRPCServiceHandler{
