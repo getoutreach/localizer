@@ -203,7 +203,8 @@ func (p *ServiceForward) createServerPod(ctx context.Context) (func(), *corev1.P
 	}
 }
 
-func (p *ServiceForward) createTransport(ctx context.Context, po *corev1.Pod, localPort int, errorChan chan<- error) (int, *portforward.PortForwarder, error) {
+func (p *ServiceForward) createTransport(ctx context.Context, po *corev1.Pod,
+	localPort int, errorChan chan<- error) (int, *portforward.PortForwarder, error) {
 	fw, err := p.createServerPortForward(ctx, po, localPort)
 	if err != nil {
 		return 0, nil, errors.Wrap(err, "failed to create tunnel for underlying transport")
@@ -245,7 +246,7 @@ func (p *ServiceForward) createTransport(ctx context.Context, po *corev1.Pod, lo
 }
 
 // Start starts forwarding a service, this blocks
-func (p *ServiceForward) Start(ctx context.Context) error {
+func (p *ServiceForward) Start(ctx context.Context) error { //nolint:funlen
 	ports := make([]string, len(p.Ports))
 	for i, port := range p.Ports {
 		prt := int(port.TargetPort.IntVal)

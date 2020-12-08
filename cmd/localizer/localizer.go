@@ -142,6 +142,6 @@ func main() { //nolint:funlen,gocyclo
 
 	if err := app.Run(os.Args); err != nil {
 		log.Errorf("failed to run: %v", err)
-		os.Exit(1)
+		return
 	}
 }

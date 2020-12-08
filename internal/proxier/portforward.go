@@ -55,8 +55,9 @@ type worker struct {
 
 // NewPortForwarder creates a new port-forward worker that handles
 // creating port-forwards and destroying port-forwards.
-//nolint:gocritic,lll // We're OK not naming these.
-func NewPortForwarder(ctx context.Context, k kubernetes.Interface, r *rest.Config, log logrus.FieldLogger) (chan<- PortForwardRequest, <-chan struct{}, *worker, error) {
+//nolint:gocritic,golint // We're OK not naming these.
+func NewPortForwarder(ctx context.Context, k kubernetes.Interface,
+	r *rest.Config, log logrus.FieldLogger) (chan<- PortForwardRequest, <-chan struct{}, *worker, error) {
 	ipamInstance := ipam.New()
 	prefix, err := ipamInstance.NewPrefix("127.0.0.1/8")
 	if err != nil {
@@ -231,7 +232,7 @@ loop:
 	return pod, nil
 }
 
-func (w *worker) CreatePortForward(ctx context.Context, req *CreatePortForwardRequest) (returnedError error) {
+func (w *worker) CreatePortForward(ctx context.Context, req *CreatePortForwardRequest) (returnedError error) { //nolint:funlen
 	serviceKey := req.Service.Key()
 	log := w.log.WithField("service", serviceKey)
 	if req.Endpoint != nil {
