@@ -16,11 +16,14 @@ package main
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"os/signal"
 	"os/user"
+	"path/filepath"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/jaredallard/localizer/internal/kevents"
 	"github.com/jaredallard/localizer/internal/kube"
@@ -36,6 +39,18 @@ var Version = "v0.0.0-unset"
 func main() { //nolint:funlen,gocyclo
 	ctx, cancel := context.WithCancel(context.Background())
 	log := logrus.New()
+	log.Formatter = &logrus.TextFormatter{
+		ForceColors: true,
+	}
+
+	tmpFilePath := filepath.Join(os.TempDir(), "localizer-"+strings.ReplaceAll(time.Now().Format(time.RFC3339), ":", "-")+".log")
+	tmpFile, err := os.Create(tmpFilePath)
+	if err == nil {
+		defer tmpFile.Close()
+
+		log.Out = io.MultiWriter(os.Stderr, tmpFile)
+		log.Info("writing to file " + tmpFilePath)
+	}
 
 	// this prevents the CLI from clobbering context cancellation
 	cli.OsExiter = func(code int) {
@@ -60,7 +75,8 @@ func main() { //nolint:funlen,gocyclo
 				Name:        "log-level",
 				Usage:       "Set the log level",
 				EnvVars:     []string{"LOG_LEVEL"},
-				DefaultText: "INFO",
+				Value:       "DEBUG",
+				DefaultText: "DEBUG",
 			},
 			&cli.StringFlag{
 				Name:        "log-format",
