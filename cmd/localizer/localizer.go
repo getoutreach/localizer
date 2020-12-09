@@ -124,10 +124,11 @@ func main() { //nolint:funlen,gocyclo
 			klog.SetLogger(&kube.KlogtoLogrus{Log: log.WithField("logger", "klog")})
 
 			// setup the global kubernetes cache interface
-			_, k, err := kube.GetKubeClient("")
+			config, k, err := kube.GetKubeClient(c.String("context"))
 			if err != nil {
 				return err
 			}
+			log.Infof("using apiserver %s", config.Host)
 			kevents.ConfigureGlobalCache(k)
 
 			return nil
@@ -151,6 +152,7 @@ func main() { //nolint:funlen,gocyclo
 			srv := server.NewGRPCService(&server.RunOpts{
 				ClusterDomain: clusterDomain,
 				IPCidr:        ipCidr,
+				KubeContext:   c.String("context"),
 			})
 			return srv.Run(ctx, log)
 		},

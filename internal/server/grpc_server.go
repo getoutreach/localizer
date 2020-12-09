@@ -52,7 +52,7 @@ func NewServiceHandler(ctx context.Context, log logrus.FieldLogger, opts *RunOpt
 	log = log.WithField("service", "*api.GRPCServiceHandler")
 
 	// TODO: pass context
-	kconf, k, err := kube.GetKubeClient("")
+	kconf, k, err := kube.GetKubeClient(opts.KubeContext)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create kube client")
 	}

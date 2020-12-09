@@ -42,19 +42,13 @@ func GetKubeClient(contextName string) (*rest.Config, kubernetes.Interface, erro
 	config, err := rest.InClusterConfig()
 	if err != nil {
 		lr := clientcmd.NewDefaultClientConfigLoadingRules()
-		apiconfig, err := lr.Load()
-		if err != nil {
-			return nil, nil, err
-		}
 
 		overrides := &clientcmd.ConfigOverrides{}
 		if contextName != "" {
 			overrides.CurrentContext = contextName
 		}
 
-		ccc := clientcmd.NewDefaultClientConfig(*apiconfig, overrides)
-
-		config, err = ccc.ClientConfig()
+		config, err = clientcmd.NewNonInteractiveDeferredLoadingClientConfig(lr, overrides).ClientConfig()
 		if err != nil {
 			return nil, nil, errors.Wrap(err, "failed to get kubernetes client config")
 		}
