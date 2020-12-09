@@ -93,6 +93,10 @@ func main() { //nolint:funlen,gocyclo
 				Usage: "Set the IP address CIDR, must include the /",
 				Value: "127.0.0.1/8",
 			},
+			&cli.StringFlag{
+				Name:  "namespace",
+				Usage: "Restrict forwarding to the given namespace. (default: all namespaces)",
+			},
 		},
 		Commands: []*cli.Command{
 			NewListCommand(log),
@@ -129,7 +133,7 @@ func main() { //nolint:funlen,gocyclo
 				return err
 			}
 			log.Infof("using apiserver %s", config.Host)
-			kevents.ConfigureGlobalCache(k)
+			kevents.ConfigureGlobalCache(k, c.String("namespace"))
 
 			return nil
 		},
