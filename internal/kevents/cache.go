@@ -22,8 +22,9 @@ type EventHandler func(Event)
 type Cache struct {
 	k kubernetes.Interface
 
-	stores map[string]cache.Store
-	subs   map[string][]EventHandler
+	stores    map[string]cache.Store
+	subs      map[string][]EventHandler
+	namespace string
 }
 
 type Event struct {
@@ -44,8 +45,8 @@ var (
 )
 
 // ConfigureGlobalCache sets up package wide global cache
-func ConfigureGlobalCache(k kubernetes.Interface) {
-	GlobalCache = &Cache{k, make(map[string]cache.Store), make(map[string][]EventHandler)}
+func ConfigureGlobalCache(k kubernetes.Interface, namespace string) {
+	GlobalCache = &Cache{k, make(map[string]cache.Store), make(map[string][]EventHandler), namespace}
 }
 
 func WaitForSync(ctx context.Context, cont cache.Controller) error {
@@ -84,7 +85,7 @@ func (c *Cache) TrackObject(resourceName string, obj runtime.Object) cache.Contr
 	key := c.getObjectType(obj)
 
 	objStore, objInformer := cache.NewInformer(
-		cache.NewListWatchFromClient(c.k.CoreV1().RESTClient(), resourceName, corev1.NamespaceAll, fields.Everything()),
+		cache.NewListWatchFromClient(c.k.CoreV1().RESTClient(), resourceName, c.namespace, fields.Everything()),
 		&corev1.Endpoints{},
 		time.Second*60,
 		cache.ResourceEventHandlerFuncs{
