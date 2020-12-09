@@ -39,6 +39,7 @@ type GRPCService struct {
 type RunOpts struct {
 	ClusterDomain string
 	IPCidr        string
+	KubeContext   string
 }
 
 func NewGRPCService(opts *RunOpts) *GRPCService {
