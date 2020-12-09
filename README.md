@@ -42,7 +42,7 @@ allowing remote resources to access your local machine as if they were also runn
 
 You can install the (OSX/LINUX) binary directly into /usr/local/bin:
 ```
-$ curl -Ls https://github.com/jaredallard/localizer/releases/download/v1.2.0/localizer_1.2.0_$(uname)_amd64.tar.gz | tar -xzC /usr/local/bin localizer
+$ curl -Ls https://github.com/jaredallard/localizer/releases/download/v1.3.0/localizer_1.3.0_$(uname)_amd64.tar.gz | tar -xzC /usr/local/bin localizer
 ```
 
 Or manually download a release from [Github Releases](../../releases/latest) and unpack it into your `PATH`.
