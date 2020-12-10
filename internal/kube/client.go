@@ -100,13 +100,13 @@ func ResolveServicePorts(ctx context.Context, k kubernetes.Interface,
 		return nil, false, fmt.Errorf("endpoints store was empty")
 	}
 
-	obj, exists, err := store.GetByKey(s.Namespace + "/" + s.Name)
+	obj, _, err := store.GetByKey(s.Namespace + "/" + s.Name)
 	if err != nil {
 		return nil, false, errors.Wrap(err, "failed to get endpoints")
 	}
 
-	e := obj.(*corev1.Endpoints)
-	if !exists || len(e.Subsets) == 0 {
+	e, ok := obj.(*corev1.Endpoints)
+	if !ok || len(e.Subsets) == 0 {
 		// if there are no endpoints, don't resolve, just return them
 		servicePorts := make([]ResolvedServicePort, len(s.Spec.Ports))
 		for i, sp := range s.Spec.Ports {

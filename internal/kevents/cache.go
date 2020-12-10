@@ -10,8 +10,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
-
-	corev1 "k8s.io/api/core/v1"
 )
 
 // GlobalCache is an optional global cache that can be initialized
@@ -86,7 +84,7 @@ func (c *Cache) TrackObject(resourceName string, obj runtime.Object) cache.Contr
 
 	objStore, objInformer := cache.NewInformer(
 		cache.NewListWatchFromClient(c.k.CoreV1().RESTClient(), resourceName, c.namespace, fields.Everything()),
-		&corev1.Endpoints{},
+		obj,
 		time.Second*60,
 		cache.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
