@@ -220,7 +220,7 @@ func (h *GRPCServiceHandler) ExposeService(req *apiv1.ExposeServiceRequest, res 
 		return fmt.Errorf("service had no defined ports")
 	}
 
-	servicePorts, exists, err := kube.ResolveServicePorts(ctx, h.k, s)
+	servicePorts, exists, err := kube.ResolveServicePorts(s)
 	if err != nil {
 		return errors.Wrap(err, "failed to resolve service ports")
 	}
