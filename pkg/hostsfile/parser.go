@@ -189,7 +189,7 @@ func (f *File) Marshal(ctx context.Context) ([]byte, error) {
 	contents := [][]byte{}
 	wroteBlock := false
 
-	// state of the block: before, after, or in
+	// state of the block: before, after, in, or discard
 	state := "before"
 
 	for scanner.Scan() {
@@ -233,6 +233,7 @@ func (f *File) Marshal(ctx context.Context) ([]byte, error) {
 			}
 
 			contents = append(contents, b)
+			state = "discard"
 		}
 	}
 	if scanner.Err() != nil {
