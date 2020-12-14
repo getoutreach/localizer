@@ -385,7 +385,7 @@ func (w *worker) setPortForwardConnectionStatus(_ context.Context, si ServiceInf
 	w.portForwards[key] = pf
 }
 
-func (w *worker) stopPortForward(ctx context.Context, conn *PortForwardConnection) error {
+func (w *worker) stopPortForward(_ context.Context, conn *PortForwardConnection) error {
 	if conn.pf != nil {
 		conn.pf.Close()
 	}
@@ -415,7 +415,7 @@ func (w *worker) stopPortForward(ctx context.Context, conn *PortForwardConnectio
 			errs = append(errs, errors.Wrap(err, "failed to remove ip address from hostsfile"))
 		}
 
-		// We don't use the context provided because if it's cancelled we need to be able to remove it still
+		// We don't use the context provided because if it's canceled we need to be able to remove it still
 		if err := w.dns.Save(context.Background()); err != nil {
 			errs = append(errs, errors.Wrap(err, "failed to save hosts file after modification(s)"))
 		}
