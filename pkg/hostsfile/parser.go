@@ -205,7 +205,7 @@ func (f *File) Marshal(ctx context.Context) ([]byte, error) {
 		case "in":
 			m, err := json.Marshal(&Metadata{
 				BlockName:    f.blockName,
-				LastModified: f.clock.Now(),
+				LastModified: f.clock.Now().UTC(),
 			})
 			if err != nil {
 				return nil, err

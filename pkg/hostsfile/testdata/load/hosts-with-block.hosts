@@ -5,6 +5,6 @@
 127.0.1.1 desktop-2cnkr3j.localdomain desktop-2cnkr3j
 
 ###start-hostfile
-###{"blockName":"localizer","last_modified_at":"1969-12-31T16:00:00-08:00"}
+###{"blockName":"localizer","last_modified_at":"1970-01-01T00:00:00Z"}
 127.0.0.1 hello-world
 ###end-hostfile
