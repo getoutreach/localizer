@@ -415,7 +415,8 @@ func (w *worker) stopPortForward(ctx context.Context, conn *PortForwardConnectio
 			errs = append(errs, errors.Wrap(err, "failed to remove ip address from hostsfile"))
 		}
 
-		if err := w.dns.Save(ctx); err != nil {
+		// We don't use the context provided because if it's cancelled we need to be able to remove it still
+		if err := w.dns.Save(context.Background()); err != nil {
 			errs = append(errs, errors.Wrap(err, "failed to save hosts file after modification(s)"))
 		}
 
