@@ -189,9 +189,7 @@ func (f *File) Marshal(ctx context.Context) ([]byte, error) {
 	contents := [][]byte{}
 	wroteBlock := false
 
-	// state of the block: before, after, in, or discard
-	state := "before"
-
+	copyLines := true
 	for scanner.Scan() {
 		select {
 		case <-ctx.Done():
@@ -212,29 +210,31 @@ func (f *File) Marshal(ctx context.Context) ([]byte, error) {
 					return nil, err
 				}
 
-				if m.BlockName == f.blockName {
-					state = "in"
+				if m.BlockName != f.blockName {
 					continue
 				}
+
+				// write the blocks' contents
+				wroteBlock = true
+				b, err := f.generateBlock()
+				if err != nil {
+					return nil, errors.Wrap(err, "failed to generate hosts entries")
+				}
+				contents = append(contents, b)
+
+				// discard lines until end block is found
+				copyLines = false
 			case "###end-hostfile":
-				state = "after"
+				copyLines = true
 				continue
 			}
 		}
 
-		switch state {
-		case "before", "after":
-			contents = append(contents, scanner.Bytes())
-		case "in":
-			wroteBlock = true
-			b, err := f.generateBlock()
-			if err != nil {
-				return nil, errors.Wrap(err, "failed to generate hosts entries")
-			}
-
-			contents = append(contents, b)
-			state = "discard"
+		if !copyLines {
+			continue
 		}
+
+		contents = append(contents, scanner.Bytes())
 	}
 	if scanner.Err() != nil {
 		return nil, scanner.Err()
