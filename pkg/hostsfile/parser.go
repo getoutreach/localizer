@@ -9,6 +9,7 @@ import (
 	"io/ioutil"
 	"net"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/asaskevich/govalidator"
@@ -23,6 +24,8 @@ type File struct {
 	fileLocation string
 	contents     []byte
 	blockName    string
+
+	lock sync.Mutex
 
 	// Normally you can have more than one ip address
 	// assigned multiple times in a hosts file, but given
@@ -87,6 +90,9 @@ func (f *File) parseMetadata(line string) (*Metadata, error) {
 
 // Load loads the hosts file into memory, and parses it.
 func (f *File) Load(ctx context.Context) error {
+	f.lock.Lock()
+	defer f.lock.Unlock()
+
 	scanner := bufio.NewScanner(bytes.NewReader(f.contents))
 
 	foundBlock := false
@@ -153,6 +159,9 @@ func (f *File) Load(ctx context.Context) error {
 
 // Marshal renders a hosts file from memory.
 func (f *File) Marshal(ctx context.Context) ([]byte, error) {
+	f.lock.Lock()
+	defer f.lock.Unlock()
+
 	scanner := bufio.NewScanner(bytes.NewReader(f.contents))
 
 	contents := [][]byte{}
@@ -237,6 +246,9 @@ func (f *File) Save(ctx context.Context) error {
 // AddHosts adds a line into the hosts file for the given hosts to resolve
 // to specified IP. Any existing hosts are replaced.
 func (f *File) AddHosts(ipAddress string, hosts []string) error {
+	f.lock.Lock()
+	defer f.lock.Unlock()
+
 	for _, h := range hosts {
 		if !govalidator.IsDNSName(h) {
 			return fmt.Errorf("'%s' is not a valid dns name", h)
@@ -249,6 +261,9 @@ func (f *File) AddHosts(ipAddress string, hosts []string) error {
 // RemoveAddress removes a given address and all hosts associated with it
 // from the hosts file
 func (f *File) RemoveAddress(ipAddress string) error {
+	f.lock.Lock()
+	defer f.lock.Unlock()
+
 	delete(f.hostsFile, ipAddress)
 	return nil
 }
