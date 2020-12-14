@@ -157,6 +157,28 @@ func (f *File) Load(ctx context.Context) error {
 	return nil
 }
 
+func (f *File) generateBlock() ([]byte, error) {
+	contents := [][]byte{}
+
+	m, err := json.Marshal(&Metadata{
+		BlockName:    f.blockName,
+		LastModified: f.clock.Now().UTC(),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	contents = append(contents, []byte("###start-hostfile"), []byte(fmt.Sprintf("###%s", m)))
+	for ip, line := range f.hostsFile {
+		contents = append(contents, []byte(
+			fmt.Sprintf("%s %s", ip, strings.Join(line.Addresses, " ")),
+		))
+	}
+	contents = append(contents, []byte("###end-hostfile"))
+
+	return bytes.Join(contents, []byte("\n")), nil
+}
+
 // Marshal renders a hosts file from memory.
 func (f *File) Marshal(ctx context.Context) ([]byte, error) {
 	f.lock.Lock()
@@ -165,6 +187,7 @@ func (f *File) Marshal(ctx context.Context) ([]byte, error) {
 	scanner := bufio.NewScanner(bytes.NewReader(f.contents))
 
 	contents := [][]byte{}
+	wroteBlock := false
 
 	// state of the block: before, after, or in
 	state := "before"
@@ -203,27 +226,27 @@ func (f *File) Marshal(ctx context.Context) ([]byte, error) {
 		case "before", "after":
 			contents = append(contents, scanner.Bytes())
 		case "in":
-			m, err := json.Marshal(&Metadata{
-				BlockName:    f.blockName,
-				LastModified: f.clock.Now().UTC(),
-			})
+			wroteBlock = true
+			b, err := f.generateBlock()
 			if err != nil {
-				return nil, err
+				return nil, errors.Wrap(err, "failed to generate hosts entries")
 			}
 
-			contents = append(contents, []byte("###start-hostfile"), []byte(fmt.Sprintf("###%s", m)))
-
-			for ip, line := range f.hostsFile {
-				contents = append(contents, []byte(
-					fmt.Sprintf("%s %s", ip, strings.Join(line.Addresses, " ")),
-				))
-			}
-
-			contents = append(contents, []byte("###end-hostfile"))
+			contents = append(contents, b)
 		}
 	}
 	if scanner.Err() != nil {
 		return nil, scanner.Err()
+	}
+
+	// if we never wrote the block, then append it to the end of the file
+	if !wroteBlock {
+		b, err := f.generateBlock()
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to generate hosts entries")
+		}
+
+		contents = append(contents, b)
 	}
 
 	return bytes.Join(contents, []byte("\n")), nil

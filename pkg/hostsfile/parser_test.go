@@ -1,6 +1,7 @@
 package hostsfile
 
 import (
+	"bytes"
 	"context"
 	"reflect"
 	"testing"
@@ -86,9 +87,35 @@ func TestFile_Marshal(t *testing.T) {
 		t.Error(errors.Wrap(err, "failed to marshal hosts file"))
 	}
 
-	// TODO: How do we test the generated contents when the date is generated?
 	if !reflect.DeepEqual(f.contents, b) {
 		t.Error("expected: ", cmp.Diff(f.contents, b))
+	}
+
+	// load a hosts file with no block, test that it gets added
+	filePath = "./testdata/load/hosts-with-no-block.hosts"
+	f, err = New(filePath, "")
+	if err != nil {
+		t.Error(err)
+	}
+
+	err = f.Load(context.Background())
+	if err != nil {
+		t.Error(errors.Wrap(err, "failed to load valid hosts file"))
+	}
+
+	f.clock = clock.NewMock()
+	b, err = f.Marshal(context.Background())
+	if err != nil {
+		t.Error(errors.Wrap(err, "failed to marshal hosts file"))
+	}
+
+	expected := bytes.Join([][]byte{
+		f.contents,
+		[]byte("###start-hostfile\n###{\"blockName\":\"localizer\",\"last_modified_at\":\"1970-01-01T00:00:00Z\"}\n###end-hostfile"),
+	}, []byte("\n"))
+
+	if !reflect.DeepEqual(expected, b) {
+		t.Error("expected: ", cmp.Diff(expected, b))
 	}
 }
 
