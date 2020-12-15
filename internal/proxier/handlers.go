@@ -42,9 +42,10 @@ func CreateHandlers(ctx context.Context, requester chan<- PortForwardRequest,
 	return serviceChan, doneChan
 }
 
-// Services
+//nolint:funlen,gocyclo
 func serviceProcessor(ctx context.Context, event <-chan ServiceEvent,
-	doneChan chan struct{}, requester chan<- PortForwardRequest, k kubernetes.Interface, clusterDomain string) {
+	doneChan chan struct{}, requester chan<- PortForwardRequest,
+	k kubernetes.Interface, clusterDomain string) {
 	for {
 		select {
 		case <-ctx.Done():
