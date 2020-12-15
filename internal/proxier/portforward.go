@@ -23,10 +23,10 @@ import (
 	"runtime"
 
 	"github.com/jaredallard/localizer/internal/kevents"
+	"github.com/jaredallard/localizer/pkg/hostsfile"
 	"github.com/metal-stack/go-ipam"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	"github.com/txn2/txeh"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/portforward"
@@ -43,7 +43,7 @@ type worker struct {
 
 	ippool ipam.Ipamer
 	ipCidr string
-	dns    *txeh.Hosts
+	dns    *hostsfile.File
 
 	reqChan    chan PortForwardRequest
 	reaperChan chan kevents.Event
@@ -78,7 +78,7 @@ func NewPortForwarder(ctx context.Context, k kubernetes.Interface,
 		}
 	}
 
-	hosts, err := txeh.NewHosts(&txeh.HostsConfig{})
+	hosts, err := hostsfile.New("", "")
 	if err != nil {
 		return nil, nil, nil, errors.Wrap(err, "failed to open up hosts file for r/w")
 	}
@@ -240,7 +240,7 @@ loop:
 	return pod, nil
 }
 
-func (w *worker) CreatePortForward(ctx context.Context, req *CreatePortForwardRequest) (returnedError error) { //nolint:funlen
+func (w *worker) CreatePortForward(ctx context.Context, req *CreatePortForwardRequest) (returnedError error) { //nolint:funlen,gocyclo
 	serviceKey := req.Service.Key()
 	log := w.log.WithField("service", serviceKey)
 	if req.Endpoint != nil {
@@ -295,9 +295,12 @@ func (w *worker) CreatePortForward(ctx context.Context, req *CreatePortForwardRe
 	}
 	pf.Hostnames = req.Hostnames
 
-	w.dns.AddHosts(ipAddress.IP.String(), req.Hostnames)
-	if err := w.dns.Save(); err != nil {
-		return errors.Wrap(err, "failed to save DNS changes")
+	if err := w.dns.AddHosts(ipAddress.IP.String(), req.Hostnames); err != nil {
+		return errors.Wrap(err, "failed to add host entry")
+	}
+
+	if err := w.dns.Save(ctx); err != nil {
+		return errors.Wrap(err, "failed to save host changes")
 	}
 
 	transport, upgrader, err := spdy.RoundTripperFor(w.rest)
@@ -408,12 +411,16 @@ func (w *worker) stopPortForward(_ context.Context, conn *PortForwardConnection)
 			errs = append(errs, errors.Wrap(err, "failed to release ip address"))
 		}
 
-		conn.IP = net.IP{}
-	}
+		if err := w.dns.RemoveAddress(conn.IP.String()); err != nil {
+			errs = append(errs, errors.Wrap(err, "failed to remove ip address from hostsfile"))
+		}
 
-	w.dns.RemoveHosts(conn.Hostnames)
-	if err := w.dns.Save(); err != nil {
-		errs = append(errs, errors.Wrap(err, "failed to remove hosts entry"))
+		// We don't use the context provided because if it's canceled we need to be able to remove it still
+		if err := w.dns.Save(context.Background()); err != nil {
+			errs = append(errs, errors.Wrap(err, "failed to save hosts file after modification(s)"))
+		}
+
+		conn.IP = net.IP{}
 	}
 
 	// if we have errors, return them

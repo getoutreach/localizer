@@ -3,6 +3,8 @@ module github.com/jaredallard/localizer
 go 1.15
 
 require (
+	github.com/asaskevich/govalidator v0.0.0-20200907205600-7a23bdc65eef
+	github.com/benbjohnson/clock v1.1.0
 	github.com/cpuguy83/go-md2man/v2 v2.0.0 // indirect
 	github.com/davecgh/go-spew v1.1.1
 	github.com/docker/distribution v2.7.1+incompatible // indirect
@@ -12,11 +14,11 @@ require (
 	github.com/function61/gokit v0.0.0-20200923114939-f8d7e065a5c3
 	github.com/go-logr/logr v0.3.0
 	github.com/golang/protobuf v1.4.3
+	github.com/google/go-cmp v0.5.0
 	github.com/imdario/mergo v0.3.11 // indirect
 	github.com/metal-stack/go-ipam v1.7.0
 	github.com/pkg/errors v0.9.1
 	github.com/sirupsen/logrus v1.7.0
-	github.com/txn2/txeh v1.3.0
 	github.com/urfave/cli/v2 v2.3.0
 	golang.org/x/crypto v0.0.0-20201124201722-c8d3bf9c5392
 	google.golang.org/grpc v1.33.2
