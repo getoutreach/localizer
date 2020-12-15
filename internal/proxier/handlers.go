@@ -42,9 +42,10 @@ func CreateHandlers(ctx context.Context, requester chan<- PortForwardRequest,
 	return serviceChan, doneChan
 }
 
-// Services
+//nolint:funlen,gocyclo
 func serviceProcessor(ctx context.Context, event <-chan ServiceEvent,
-	doneChan chan struct{}, requester chan<- PortForwardRequest, k kubernetes.Interface, clusterDomain string) {
+	doneChan chan struct{}, requester chan<- PortForwardRequest,
+	k kubernetes.Interface, clusterDomain string) {
 	for {
 		select {
 		case <-ctx.Done():
@@ -102,12 +103,39 @@ func serviceProcessor(ctx context.Context, event <-chan ServiceEvent,
 				case ServiceTypeStatefulset:
 					// TODO: This doesn't support multiple pods for a service right now
 					// eventually we should support that.
-					name := fmt.Sprintf("%s.%s", info.Name+"-0", info.Name)
+					// grab the first endpoint to build the name. This sucks, but it's
+					// needed for Outreach's usecases. Please remove this.
+					obj, exists, err := kevents.GlobalCache.GetStore(&corev1.Endpoints{}).GetByKey(s.Service.Namespace + "/" + s.Service.Name)
+					if err != nil || !exists {
+						continue
+					}
+					endpoints := obj.(*corev1.Endpoints)
+
+					refName := ""
+
+				loop:
+					for _, sub := range endpoints.Subsets {
+						for _, a := range sub.Addresses {
+							if a.TargetRef != nil && a.TargetRef.Kind == "Pod" {
+								refName = a.TargetRef.Name
+								break loop
+							}
+						}
+					}
+
+					name := fmt.Sprintf("%s.%s", refName, info.Name)
 					msg = PortForwardRequest{
 						CreatePortForwardRequest: &CreatePortForwardRequest{
 							Service: info,
 							Ports:   ports,
 							Hostnames: []string{
+								// headless service to one of the endpoints
+								info.Name,
+								info.Name + "." + info.Namespace,
+								info.Name + "." + info.Namespace + ".svc",
+								info.Name + "." + info.Namespace + ".svc." + clusterDomain,
+
+								// pod level
 								name,
 								fmt.Sprintf("%s.%s", name, info.Namespace),
 								fmt.Sprintf("%s.%s.svc", name, info.Namespace),
