@@ -25,7 +25,8 @@ type File struct {
 	contents     []byte
 	blockName    string
 
-	lock sync.Mutex
+	lock     sync.Mutex
+	saveLock sync.Mutex
 
 	// Normally you can have more than one ip address
 	// assigned multiple times in a hosts file, but given
@@ -263,6 +264,10 @@ func (f *File) Save(ctx context.Context) error {
 	if err != nil {
 		return errors.Wrap(err, "failed to marshal hostsfile")
 	}
+
+	// ensure we don't write to the file at the same time
+	f.saveLock.Lock()
+	defer f.saveLock.Unlock()
 
 	return ioutil.WriteFile(f.fileLocation, b, 0644)
 }
