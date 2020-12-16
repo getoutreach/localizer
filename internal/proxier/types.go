@@ -20,6 +20,8 @@ import (
 	"k8s.io/client-go/tools/portforward"
 )
 
+const PodKind = "Pod"
+
 type PodInfo struct {
 	// Name is the name of this pod
 	Name string
@@ -32,24 +34,12 @@ func (s *PodInfo) Key() string {
 	return fmt.Sprintf("%s/%s", s.Namespace, s.Name)
 }
 
-type ServiceType string
-
-var (
-	ServiceTypeStandard    ServiceType = ""
-	ServiceTypeStatefulset ServiceType = "statefulset"
-)
-
 type ServiceInfo struct {
 	// Name is the name of this service
 	Name string
 
 	// Namespace is the namespace of this service
 	Namespace string
-
-	// Type of service this is
-	// statefulset service forwards all pods and enables
-	// <pod>.<service> resolution
-	Type ServiceType
 }
 
 func (s *ServiceInfo) Key() string {

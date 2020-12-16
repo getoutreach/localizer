@@ -197,7 +197,7 @@ func (c *Client) getOwnerRefKey(ref *corev1.ObjectReference) string {
 // getServiceControllers looks for deployments, statefulsets, and other things
 // that created pods attached to a service tracks them along with their current
 // scale.
-func (c *Client) getServiceControllers(ctx context.Context, namespace, serviceName string) (map[string]scaledObjectType, error) { //nolint:funlen,gocyclo,lll
+func (c *Client) getServiceControllers(ctx context.Context, namespace, serviceName string) (map[string]scaledObjectType, error) { //nolint:funlen,lll
 	e, err := c.k.CoreV1().Endpoints(namespace).Get(ctx, serviceName, metav1.GetOptions{})
 	if err != nil {
 		return nil, err

@@ -36,7 +36,7 @@ import (
 
 var Version = "v0.0.0-unset"
 
-func main() { //nolint:funlen,gocyclo
+func main() { //nolint:funlen
 	ctx, cancel := context.WithCancel(context.Background())
 	log := logrus.New()
 	log.Formatter = &logrus.TextFormatter{

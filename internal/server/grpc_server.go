@@ -62,10 +62,13 @@ func NewServiceHandler(ctx context.Context, log logrus.FieldLogger, opts *RunOpt
 		return nil, errors.Wrap(err, "failed to start expose container")
 	}
 
-	p := proxier.NewProxier(ctx, k, kconf, log, &proxier.ProxyOpts{
+	p, err := proxier.NewProxier(ctx, k, kconf, log, &proxier.ProxyOpts{
 		ClusterDomain: opts.ClusterDomain,
 		IPCidr:        opts.IPCidr,
 	})
+	if err != nil {
+		return nil, errors.Wrap(err, "Failed to create proxier")
+	}
 	///EndBlock(grpcInit)
 
 	return &GRPCServiceHandler{
