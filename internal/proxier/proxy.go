@@ -83,7 +83,7 @@ func IndexEndpointsByActivePod(obj interface{}) ([]string, error) {
 	var pods []string
 	for _, subset := range endpoints.Subsets {
 		for _, address := range subset.Addresses {
-			if address.TargetRef == nil || address.TargetRef.Kind != "Pod" {
+			if address.TargetRef == nil || address.TargetRef.Kind != PodKind {
 				continue
 			}
 			pods = append(pods, address.TargetRef.Name)
@@ -252,7 +252,7 @@ func (p *Proxier) reconcile(key string) error {
 	case PortForwardStatusWaiting:
 		for _, subset := range endpoints.Subsets {
 			for _, address := range subset.Addresses {
-				if address.TargetRef != nil && address.TargetRef.Kind == "Pod" {
+				if address.TargetRef != nil && address.TargetRef.Kind == PodKind {
 					p.createPortforward(svc, "endpoint became available")
 				}
 			}
@@ -300,7 +300,7 @@ func (p *Proxier) createPortforward(svc *corev1.Service, recreate string) {
 	loop:
 		for _, sub := range endpoints.Subsets {
 			for _, a := range sub.Addresses {
-				if a.TargetRef != nil && a.TargetRef.Kind == "Pod" {
+				if a.TargetRef != nil && a.TargetRef.Kind == PodKind {
 					refName = a.TargetRef.Name
 					break loop
 				}

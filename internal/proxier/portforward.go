@@ -156,7 +156,7 @@ loop:
 				continue
 			}
 
-			if addr.TargetRef.Kind != "Pod" {
+			if addr.TargetRef.Kind != PodKind {
 				continue
 			}
 

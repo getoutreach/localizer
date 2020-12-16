@@ -20,6 +20,8 @@ import (
 	"k8s.io/client-go/tools/portforward"
 )
 
+const PodKind = "Pod"
+
 type PodInfo struct {
 	// Name is the name of this pod
 	Name string
