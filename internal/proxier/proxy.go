@@ -211,7 +211,7 @@ func (p *Proxier) reconcile(key string) error {
 	}
 
 	if !exists {
-		//we don')t have the service object anymore, we need to get the namespace/name from the key
+		// we don't have the service object anymore, we need to get the namespace/name from the key
 		namespace, name, err := cache.SplitMetaNamespaceKey(key)
 		if err != nil {
 			return err
