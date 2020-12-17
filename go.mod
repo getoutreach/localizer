@@ -36,5 +36,5 @@ require (
 replace (
 	// This fixes macOS builds for now.
 	golang.org/x/sys => golang.org/x/sys v0.0.0-20200826173525-f9321e4c35a6
-	k8s.io/client-go => github.com/jaredallard/client-go v0.0.0-20201216203657-cc48b6b74693
+	k8s.io/client-go => github.com/jaredallard/client-go v0.0.0-20201217040833-212405e5056e
 )

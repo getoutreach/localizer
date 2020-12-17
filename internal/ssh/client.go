@@ -111,13 +111,15 @@ func (c *Client) Start(ctx context.Context, serviceKey string) error {
 	go func() {
 		t := time.NewTicker(2 * time.Second)
 		defer t.Stop()
+		defer func() {
+			c.log.Info("ssh-keep alive creator exited")
+		}()
 
 		for {
 			select {
 			case <-ctx.Done():
 				return
 			case <-t.C:
-				c.log.Debug("sending ssh-keepalive")
 				_, _, err := sshClient.Conn.SendRequest("keepalive@golang.org", true, nil)
 				if err != nil {
 					c.log.WithError(err).Warn("failed to send keep-alive")
