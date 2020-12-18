@@ -29,11 +29,12 @@ require (
 	// kubernetes deps
 	k8s.io/api v0.19.3
 	k8s.io/apimachinery v0.19.3
-	k8s.io/client-go v0.19.3
+	k8s.io/client-go v0.0.0-00010101000000-000000000000
 	k8s.io/klog/v2 v2.4.0
 )
 
-replace k8s.io/client-go => github.com/jaredallard/client-go v0.0.0-20200919203213-e55c7f2b41ab
-
-// This fixes macOS builds for now.
-replace golang.org/x/sys => golang.org/x/sys v0.0.0-20200826173525-f9321e4c35a6
+replace (
+	// This fixes macOS builds for now.
+	golang.org/x/sys => golang.org/x/sys v0.0.0-20200826173525-f9321e4c35a6
+	k8s.io/client-go => github.com/jaredallard/client-go v0.0.0-20201216203657-cc48b6b74693
+)
