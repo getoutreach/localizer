@@ -5,5 +5,6 @@
   ],
   "rebaseWhen": "auto",
   "semanticCommits": "enabled",
-  "automerge": true
+  "automerge": true,
+  "commitBody": "Signed-off-by: Jared Allard <jaredallard@hey.com>"
 }
