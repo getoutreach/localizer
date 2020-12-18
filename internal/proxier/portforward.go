@@ -373,9 +373,9 @@ func (w *worker) DeletePortForward(ctx context.Context, req *DeletePortForwardRe
 	serviceKey := req.Service.Key()
 	log := w.log.WithField("service", serviceKey)
 
-	// skip port-forwards that are already being managed
+	// nothing to do for non exiting forwards.
 	if w.portForwards[serviceKey] == nil {
-		return fmt.Errorf("no port-forward exists for this service")
+		return nil
 	}
 
 	if err := w.stopPortForward(ctx, w.portForwards[serviceKey]); err != nil {
