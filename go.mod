@@ -14,7 +14,7 @@ require (
 	github.com/function61/gokit v0.0.0-20201208150714-430c31fdbc6a
 	github.com/go-logr/logr v0.3.0
 	github.com/golang/protobuf v1.4.3
-	github.com/google/go-cmp v0.5.0
+	github.com/google/go-cmp v0.5.4
 	github.com/imdario/mergo v0.3.11 // indirect
 	github.com/metal-stack/go-ipam v1.7.0
 	github.com/pkg/errors v0.9.1
