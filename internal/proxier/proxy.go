@@ -16,13 +16,18 @@ package proxier
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/jaredallard/localizer/internal/kevents"
+	"github.com/jaredallard/localizer/internal/kube"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/util/workqueue"
 )
 
 // Proxier handles creating an maintaining proxies to a remote
@@ -34,6 +39,12 @@ type Proxier struct {
 	worker *worker
 
 	opts *ProxyOpts
+
+	queue             workqueue.RateLimitingInterface
+	threadiness       int
+	svcInformer       cache.SharedIndexInformer
+	endpointsInformer cache.SharedIndexInformer
+	pfrequest         chan<- PortForwardRequest
 }
 
 type ServiceStatus struct {
@@ -64,56 +75,255 @@ type ProxyOpts struct {
 	IPCidr        string
 }
 
-// NewProxier creates a new proxier instance
-func NewProxier(ctx context.Context, k kubernetes.Interface, kconf *rest.Config, log logrus.FieldLogger, opts *ProxyOpts) *Proxier {
-	return &Proxier{
-		k:    k,
-		rest: kconf,
-		log:  log,
-		opts: opts,
+func IndexEndpointsByActivePod(obj interface{}) ([]string, error) {
+	endpoints, ok := obj.(*corev1.Endpoints)
+	if !ok {
+		return nil, errors.New("indexer only works on Endpoints")
 	}
+	var pods []string
+	for _, subset := range endpoints.Subsets {
+		for _, address := range subset.Addresses {
+			if address.TargetRef == nil || address.TargetRef.Kind != PodKind {
+				continue
+			}
+			pods = append(pods, address.TargetRef.Name)
+		}
+	}
+	return pods, nil
+}
+
+// NewProxier creates a new proxier instance
+func NewProxier(ctx context.Context, k kubernetes.Interface, kconf *rest.Config, log logrus.FieldLogger, opts *ProxyOpts) (*Proxier, error) { //nolint:lll
+	svcInformer := kevents.GlobalCache.Core().V1().Services().Informer()
+	endpointsInformer := kevents.GlobalCache.Core().V1().Endpoints().Informer()
+
+	p := &Proxier{
+		k:                 k,
+		rest:              kconf,
+		log:               log,
+		opts:              opts,
+		queue:             workqueue.NewRateLimitingQueue(workqueue.DefaultItemBasedRateLimiter()),
+		threadiness:       1,
+		svcInformer:       svcInformer,
+		endpointsInformer: endpointsInformer,
+	}
+
+	svcInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
+		AddFunc: func(obj interface{}) {
+			key, err := cache.MetaNamespaceKeyFunc(obj)
+			if err == nil {
+				p.queue.Add(key)
+			}
+		},
+		UpdateFunc: func(oldObj, obj interface{}) {
+			key, err := cache.MetaNamespaceKeyFunc(obj)
+			if err == nil {
+				p.queue.Add(key)
+			}
+		},
+		DeleteFunc: func(obj interface{}) {
+			key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
+			if err == nil {
+				p.queue.Add(key)
+			}
+		},
+	})
+
+	endpointsInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
+		UpdateFunc: func(oldObj, obj interface{}) {
+			key, err := cache.MetaNamespaceKeyFunc(obj)
+			if err == nil {
+				p.queue.Add(key)
+			}
+		},
+	})
+	return p, endpointsInformer.AddIndexers(cache.Indexers{
+		"pods": IndexEndpointsByActivePod,
+	})
 }
 
 // Start starts the proxier
 // TODO: replace raw cluster domain with options struct, maybe also
 // move into NewProxier
 func (p *Proxier) Start(ctx context.Context) error {
+	defer p.queue.ShutDown()
+
 	log := p.log.WithField("component", "proxier")
 	portForwarder, pfdoneChan, worker, err := NewPortForwarder(ctx, p.k, p.rest, p.log, p.opts)
+	p.pfrequest = portForwarder
+
+	log.Infof("Starting %d proxier worker(s)", p.threadiness)
+	for i := 0; i < p.threadiness; i++ {
+		go wait.Until(p.runWorker, time.Second, ctx.Done())
+	}
+
 	if err != nil {
 		return err
 	}
 	p.worker = worker
 
-	serviceChan, handlerDoneChan := CreateHandlers(ctx, portForwarder, p.k, p.opts.ClusterDomain)
+	<-ctx.Done()
+	log.Info("waiting for port-forward worker to finish")
+	<-pfdoneChan
+	return nil
+}
 
-	err = kevents.WaitForSync(ctx, kevents.GlobalCache.TrackObject("endpoints", &corev1.Endpoints{}))
-	if err != nil {
-		return errors.Wrap(err, "failed to sync endpoint cache")
+func (p *Proxier) runWorker() {
+	for p.processNextWorkItem() {
+
+	}
+}
+
+func (p *Proxier) processNextWorkItem() bool {
+	key, quit := p.queue.Get()
+	if quit {
+		return false
+	}
+	defer p.queue.Done(key)
+
+	// Invoke the method containing the business logic
+	err := p.reconcile(key.(string))
+
+	if err == nil {
+		// Forget about the #AddRateLimited history of the key on every successful synchronization.
+		// This ensures that future processing of updates for this key is not delayed because of
+		// an outdated error history.
+		p.queue.Forget(key)
+		return true
 	}
 
-	// Handle services being created, send them to the proxier
-	err = kevents.GlobalCache.Subscribe(ctx, "services", &corev1.Service{}, func(e kevents.Event) {
-		if e.Event == kevents.EventTypeUpdated {
-			return
-		}
+	if p.queue.NumRequeues(key) < 5 {
+		// Re-enqueue the key rate limited. Based on the rate limiter on the
+		// queue and the re-enqueue history, the key will be processed later again.
+		p.queue.AddRateLimited(key)
+		return true
+	}
 
-		serviceChan <- ServiceEvent{
-			EventType: e.Event,
-			Service:   e.NewObject.(*corev1.Service),
-		}
-	})
+	// Retries exceeded. Forgetting for this reconciliation loop
+	p.queue.Forget(key)
+	return true
+}
+
+func (p *Proxier) reconcile(key string) error {
+	o, exists, err := p.svcInformer.GetStore().GetByKey(key)
 	if err != nil {
 		return err
 	}
 
-	log.Info("waiting for kubernetes handlers to finish")
-	<-handlerDoneChan
+	if !exists {
+		// we don't have the service object anymore, we need to get the namespace/name from the key
+		namespace, name, err := cache.SplitMetaNamespaceKey(key)
+		if err != nil {
+			return err
+		}
+		p.pfrequest <- PortForwardRequest{
+			DeletePortForwardRequest: &DeletePortForwardRequest{
+				Service: ServiceInfo{Namespace: namespace, Name: name},
+			},
+		}
+		return nil
+	}
+	svc := o.(*corev1.Service)
 
-	log.Info("waiting for port-forward worker to finish")
-	<-pfdoneChan
+	if svc.DeletionTimestamp != nil {
+		p.pfrequest <- PortForwardRequest{
+			DeletePortForwardRequest: &DeletePortForwardRequest{
+				Service: ServiceInfo{Namespace: svc.Namespace, Name: svc.Name},
+			},
+		}
+		return nil
+	}
+
+	existingForward := p.worker.portForwards[key]
+	if existingForward == nil {
+		//create a new port forward
+		p.createPortforward(svc, "")
+		return nil
+	}
+
+	e, exists, err := p.endpointsInformer.GetStore().GetByKey(key)
+	if !exists || err != nil {
+		// no endpoints for service nothing we can do atm
+		return nil
+	}
+	endpoints := e.(*corev1.Endpoints)
+
+	switch existingForward.Status {
+	case PortForwardStatusWaiting:
+		for _, subset := range endpoints.Subsets {
+			for _, address := range subset.Addresses {
+				if address.TargetRef != nil && address.TargetRef.Kind == PodKind {
+					p.createPortforward(svc, "endpoint became available")
+				}
+			}
+		}
+
+	case PortForwardStatusRunning:
+		if endpoints, err := p.endpointsInformer.GetIndexer().ByIndex("pods", existingForward.Pod.Name); err == nil && len(endpoints) == 0 {
+			p.createPortforward(svc, fmt.Sprintf("endpoints '%s' was removed", existingForward.Pod.Key()))
+		}
+	case PortForwardStatusRecreating:
+		//make exhaustive linter happy
+	}
 
 	return nil
+}
+
+func (p *Proxier) createPortforward(svc *corev1.Service, recreate string) {
+	info := ServiceInfo{Namespace: svc.Namespace, Name: svc.Name}
+	// resolve the service ports using endpoints if possible.
+	resolvedPorts, _, err := kube.ResolveServicePorts(svc)
+	if err != nil {
+		return
+	}
+
+	ports := make([]string, len(svc.Spec.Ports))
+	for i, p := range resolvedPorts {
+		ports[i] = fmt.Sprintf("%d:%d", p.Port, p.TargetPort.IntValue())
+	}
+	req := CreatePortForwardRequest{
+		Service: info,
+		Ports:   ports,
+		Hostnames: []string{
+			info.Name,
+			fmt.Sprintf("%s.%s", info.Name, info.Namespace),
+			fmt.Sprintf("%s.%s.svc", info.Name, info.Namespace),
+			fmt.Sprintf("%s.%s.svc.%s", info.Name, info.Namespace, p.opts.ClusterDomain),
+		},
+	}
+	// hack for basic support of statful sets.
+	// grab the first endpoint to build the name. This sucks, but it's
+	// needed for Outreach's usecases. Please remove this.
+	if obj, exists, err := p.endpointsInformer.GetStore().GetByKey(svc.Namespace + "/" + svc.Name); err == nil && exists {
+		endpoints := obj.(*corev1.Endpoints)
+		refName := ""
+	loop:
+		for _, sub := range endpoints.Subsets {
+			for _, a := range sub.Addresses {
+				if a.TargetRef != nil && a.TargetRef.Kind == PodKind {
+					refName = a.TargetRef.Name
+					break loop
+				}
+			}
+		}
+		if refName != "" {
+			name := fmt.Sprintf("%s.%s", refName, info.Name)
+			req.Hostnames = append(req.Hostnames,
+				fmt.Sprintf("%s.%s", name, info.Namespace),
+				fmt.Sprintf("%s.%s.svc", name, info.Namespace),
+				fmt.Sprintf("%s.%s.svc.%s", name, info.Namespace, p.opts.ClusterDomain),
+			)
+		}
+	}
+
+	if recreate != "" {
+		req.Recreate = true
+		req.RecreateReason = recreate
+	}
+
+	p.pfrequest <- PortForwardRequest{
+		CreatePortForwardRequest: &req,
+	}
 }
 
 func (p *Proxier) List(ctx context.Context) ([]ServiceStatus, error) {

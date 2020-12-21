@@ -25,6 +25,7 @@ import (
 	"google.golang.org/grpc/reflection"
 
 	apiv1 "github.com/jaredallard/localizer/api/v1"
+	"github.com/jaredallard/localizer/internal/kevents"
 )
 
 const SocketPath = "/var/run/localizer.sock"
@@ -91,6 +92,11 @@ func (g *GRPCService) Run(ctx context.Context, log logrus.FieldLogger) error {
 			log.WithError(err).Error("grpc server exited")
 		}
 	}()
+	//start the informers
+	kevents.GlobalCache.Start(ctx.Done())
+	log.Info("Waiting for caches to sync...")
+	kevents.GlobalCache.WaitForCacheSync(ctx.Done())
+	log.Info("Caches synced")
 
 	if err := h.p.Start(ctx); err != nil {
 		log.WithError(err).Error("failed to start proxy informers")

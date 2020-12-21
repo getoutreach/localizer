@@ -22,7 +22,6 @@ import (
 	"os/exec"
 	"runtime"
 
-	"github.com/jaredallard/localizer/internal/kevents"
 	"github.com/jaredallard/localizer/pkg/hostsfile"
 	"github.com/metal-stack/go-ipam"
 	"github.com/pkg/errors"
@@ -32,7 +31,6 @@ import (
 	"k8s.io/client-go/tools/portforward"
 	"k8s.io/client-go/transport/spdy"
 
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -45,9 +43,8 @@ type worker struct {
 	ipCidr string
 	dns    *hostsfile.File
 
-	reqChan    chan PortForwardRequest
-	reaperChan chan kevents.Event
-	doneChan   chan<- struct{}
+	reqChan  chan PortForwardRequest
+	doneChan chan<- struct{}
 
 	// portForwards are existing port-forwards
 	portForwards map[string]*PortForwardConnection
@@ -85,7 +82,6 @@ func NewPortForwarder(ctx context.Context, k kubernetes.Interface,
 
 	doneChan := make(chan struct{})
 	reqChan := make(chan PortForwardRequest, 1024)
-	reaperChan := make(chan kevents.Event, 1024)
 
 	w := &worker{
 		k:            k,
@@ -95,75 +91,13 @@ func NewPortForwarder(ctx context.Context, k kubernetes.Interface,
 		ipCidr:       prefix.Cidr,
 		dns:          hosts,
 		reqChan:      reqChan,
-		reaperChan:   reaperChan,
 		doneChan:     doneChan,
 		portForwards: make(map[string]*PortForwardConnection),
-	}
-
-	err = kevents.GlobalCache.Subscribe(ctx, "endpoints", &corev1.Endpoints{}, w.Reaper)
-	if err != nil {
-		return nil, nil, nil, err
 	}
 
 	go w.Start(ctx)
 
 	return reqChan, doneChan, w, nil
-}
-
-// Repear reaps dead connections based off of endpoint updates
-func (w *worker) Reaper(e kevents.Event) {
-	endpoints := e.NewObject.(*corev1.Endpoints)
-
-	// check if we care about this endpoint by checking if it's
-	// part of our registered services
-	conns, ok := w.portForwards[(&ServiceInfo{endpoints.Name, endpoints.Namespace, ""}).Key()]
-	if !ok {
-		return
-	}
-
-	foundEndpoints := make(map[PodInfo]bool)
-	for _, subset := range endpoints.Subsets {
-		for _, addr := range subset.Addresses {
-			if addr.TargetRef == nil {
-				continue
-			}
-
-			if addr.TargetRef.Kind != "Pod" {
-				continue
-			}
-
-			foundEndpoints[PodInfo{addr.TargetRef.Name, addr.TargetRef.Namespace}] = true
-		}
-	}
-
-	// endpoint still exists, so don't do anything
-	if _, ok := foundEndpoints[conns.Pod]; ok {
-		return
-	}
-
-	reason := fmt.Sprintf("endpoints '%s' was removed", conns.Pod.Key())
-
-	// handle a service that had no endpoints before, but now does
-	// TODO: use ptr
-	if conns.Pod.Key() == "/" {
-		if len(foundEndpoints) != 0 {
-			reason = "found endpoints, service originally had none"
-		} else {
-			// if no endpoints still, then ignore it
-			return
-		}
-	}
-
-	// refresh pods we didn't find
-	w.reqChan <- PortForwardRequest{
-		CreatePortForwardRequest: &CreatePortForwardRequest{
-			Service:        conns.Service,
-			Hostnames:      conns.Hostnames,
-			Ports:          conns.Ports,
-			Recreate:       true,
-			RecreateReason: reason,
-		},
-	}
 }
 
 // Start starts the worker process. This is done when the worker is created
@@ -222,7 +156,7 @@ loop:
 				continue
 			}
 
-			if addr.TargetRef.Kind != "Pod" {
+			if addr.TargetRef.Kind != PodKind {
 				continue
 			}
 
@@ -439,9 +373,9 @@ func (w *worker) DeletePortForward(ctx context.Context, req *DeletePortForwardRe
 	serviceKey := req.Service.Key()
 	log := w.log.WithField("service", serviceKey)
 
-	// skip port-forwards that are already being managed
+	// nothing to do for non exiting forwards.
 	if w.portForwards[serviceKey] == nil {
-		return fmt.Errorf("no port-forward exists for this service")
+		return nil
 	}
 
 	if err := w.stopPortForward(ctx, w.portForwards[serviceKey]); err != nil {
