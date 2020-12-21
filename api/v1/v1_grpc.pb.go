@@ -20,6 +20,7 @@ type LocalizerServiceClient interface {
 	ExposeService(ctx context.Context, in *ExposeServiceRequest, opts ...grpc.CallOption) (LocalizerService_ExposeServiceClient, error)
 	StopExpose(ctx context.Context, in *StopExposeRequest, opts ...grpc.CallOption) (LocalizerService_StopExposeClient, error)
 	List(ctx context.Context, in *ListRequest, opts ...grpc.CallOption) (*ListResponse, error)
+	Ping(ctx context.Context, in *PingRequest, opts ...grpc.CallOption) (*PingResponse, error)
 }
 
 type localizerServiceClient struct {
@@ -103,6 +104,15 @@ func (c *localizerServiceClient) List(ctx context.Context, in *ListRequest, opts
 	return out, nil
 }
 
+func (c *localizerServiceClient) Ping(ctx context.Context, in *PingRequest, opts ...grpc.CallOption) (*PingResponse, error) {
+	out := new(PingResponse)
+	err := c.cc.Invoke(ctx, "/api.v1.LocalizerService/Ping", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // LocalizerServiceServer is the server API for LocalizerService service.
 // All implementations must embed UnimplementedLocalizerServiceServer
 // for forward compatibility
@@ -110,6 +120,7 @@ type LocalizerServiceServer interface {
 	ExposeService(*ExposeServiceRequest, LocalizerService_ExposeServiceServer) error
 	StopExpose(*StopExposeRequest, LocalizerService_StopExposeServer) error
 	List(context.Context, *ListRequest) (*ListResponse, error)
+	Ping(context.Context, *PingRequest) (*PingResponse, error)
 	mustEmbedUnimplementedLocalizerServiceServer()
 }
 
@@ -125,6 +136,9 @@ func (UnimplementedLocalizerServiceServer) StopExpose(*StopExposeRequest, Locali
 }
 func (UnimplementedLocalizerServiceServer) List(context.Context, *ListRequest) (*ListResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method List not implemented")
+}
+func (UnimplementedLocalizerServiceServer) Ping(context.Context, *PingRequest) (*PingResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Ping not implemented")
 }
 func (UnimplementedLocalizerServiceServer) mustEmbedUnimplementedLocalizerServiceServer() {}
 
@@ -199,6 +213,24 @@ func _LocalizerService_List_Handler(srv interface{}, ctx context.Context, dec fu
 	return interceptor(ctx, in, info, handler)
 }
 
+func _LocalizerService_Ping_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PingRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(LocalizerServiceServer).Ping(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/api.v1.LocalizerService/Ping",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(LocalizerServiceServer).Ping(ctx, req.(*PingRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 var _LocalizerService_serviceDesc = grpc.ServiceDesc{
 	ServiceName: "api.v1.LocalizerService",
 	HandlerType: (*LocalizerServiceServer)(nil),
@@ -206,6 +238,10 @@ var _LocalizerService_serviceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "List",
 			Handler:    _LocalizerService_List_Handler,
+		},
+		{
+			MethodName: "Ping",
+			Handler:    _LocalizerService_Ping_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{

@@ -1,8 +1,22 @@
+// Copyright 2020 Jared Allard
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 package hostsfile
 
 import (
 	"bytes"
 	"context"
+	"io/ioutil"
 	"reflect"
 	"testing"
 
@@ -113,6 +127,38 @@ func TestFile_Marshal(t *testing.T) {
 		f.contents,
 		[]byte("###start-hostfile\n###{\"blockName\":\"localizer\",\"last_modified_at\":\"1970-01-01T00:00:00Z\"}\n###end-hostfile"),
 	}, []byte("\n"))
+
+	if !reflect.DeepEqual(expected, b) {
+		t.Error("expected: ", cmp.Diff(expected, b))
+	}
+}
+
+// Ensure that we don't corrupt hosts files that have data inside of
+// a block already. This was triggering it in the past. This also ensures
+// that our hosts file is ordered
+func TestFile_HandleCorruption(t *testing.T) {
+	f, err := New("./testdata/load/hosts-with-block-corrupt.hosts", "")
+	if err != nil {
+		t.Error(err)
+	}
+	f.clock = clock.NewMock()
+
+	err = f.Load(context.Background())
+	if err != nil {
+		t.Error(errors.Wrap(err, "failed to load valid hosts file"))
+	}
+
+	b, err := f.Marshal(context.Background())
+	if err != nil {
+		t.Error(errors.Wrap(err, "failed to marshal hosts file"))
+	}
+
+	origContents, err := ioutil.ReadFile("./testdata/load/hosts-with-block-corrupt.hosts")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	expected := origContents
 
 	if !reflect.DeepEqual(expected, b) {
 		t.Error("expected: ", cmp.Diff(expected, b))

@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"time"
 
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -49,10 +50,37 @@ func NewGRPCService(opts *RunOpts) *GRPCService {
 	}
 }
 
+// CleanupPreviousInstance attempts to cleanup after a dead localizer instance
+// if a not dead one is found, an error is returned or if it fails to cleanup
+func (g *GRPCService) CleanupPreviousInstance(ctx context.Context) error {
+	var cancel context.CancelFunc
+	ctx, cancel = context.WithTimeout(ctx, time.Second*10)
+	defer cancel()
+
+	conn, err := grpc.DialContext(ctx, "unix://"+SocketPath,
+		grpc.WithBlock(), grpc.WithInsecure())
+
+	// if we made a connection, see if it's responding to pings
+	// eventually we can expose useful information here?
+	if err == nil {
+		client := apiv1.NewLocalizerServiceClient(conn)
+		_, err = client.Ping(ctx, &apiv1.PingRequest{})
+		if err == nil {
+			return fmt.Errorf("localizer instance is already running")
+		}
+	}
+
+	return errors.Wrap(os.Remove(SocketPath), "failed to cleanup socket from old localizer instance")
+}
+
 // Run starts a grpc server with the internal server handler
 func (g *GRPCService) Run(ctx context.Context, log logrus.FieldLogger) error {
 	if _, err := os.Stat(SocketPath); err == nil {
-		return fmt.Errorf("localizer instance already running")
+		// if we found an existing instance, attempt to cleanup after it
+		err = g.CleanupPreviousInstance(ctx)
+		if err != nil {
+			return err
+		}
 	}
 
 	l, err := net.Listen("unix", SocketPath)
