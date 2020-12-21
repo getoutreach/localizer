@@ -1,3 +1,16 @@
+// Copyright 2020 Jared Allard
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 package hostsfile
 
 import (
@@ -8,6 +21,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -158,26 +172,41 @@ func (f *File) Load(ctx context.Context) error {
 	return nil
 }
 
-func (f *File) generateBlock() ([]byte, error) {
-	contents := [][]byte{}
+func (f *File) generateBlock() (string, error) {
+	contents := []string{}
 
 	m, err := json.Marshal(&Metadata{
 		BlockName:    f.blockName,
 		LastModified: f.clock.Now().UTC(),
 	})
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
-	contents = append(contents, []byte("###start-hostfile"), []byte(fmt.Sprintf("###%s", m)))
-	for ip, line := range f.hostsFile {
-		contents = append(contents, []byte(
-			fmt.Sprintf("%s %s", ip, strings.Join(line.Addresses, " ")),
-		))
-	}
-	contents = append(contents, []byte("###end-hostfile"))
+	// ensure the output is stable, convert the keys
+	// into a sorted slice
+	ipAddresses := make([]string, len(f.hostsFile))
 
-	return bytes.Join(contents, []byte("\n")), nil
+	i := 0
+	for ip := range f.hostsFile {
+		ipAddresses[i] = ip
+		i++
+	}
+
+	sort.Slice(ipAddresses, func(i, j int) bool {
+		return bytes.Compare(net.ParseIP(ipAddresses[i]), net.ParseIP(ipAddresses[j])) < 0
+	})
+
+	contents = append(contents, "###start-hostfile", fmt.Sprintf("###%s", m))
+	for _, ip := range ipAddresses {
+		contents = append(
+			contents,
+			fmt.Sprintf("%s %s", ip, strings.Join(f.hostsFile[ip].Addresses, " ")),
+		)
+	}
+	contents = append(contents, "###end-hostfile")
+
+	return strings.Join(contents, "\n"), nil
 }
 
 // Marshal renders a hosts file from memory.
@@ -187,7 +216,7 @@ func (f *File) Marshal(ctx context.Context) ([]byte, error) {
 
 	scanner := bufio.NewScanner(bytes.NewReader(f.contents))
 
-	contents := [][]byte{}
+	contents := []string{}
 	wroteBlock := false
 
 	copyLines := true
@@ -235,7 +264,7 @@ func (f *File) Marshal(ctx context.Context) ([]byte, error) {
 			continue
 		}
 
-		contents = append(contents, scanner.Bytes())
+		contents = append(contents, scanner.Text())
 	}
 	if scanner.Err() != nil {
 		return nil, scanner.Err()
@@ -251,7 +280,7 @@ func (f *File) Marshal(ctx context.Context) ([]byte, error) {
 		contents = append(contents, b)
 	}
 
-	return bytes.Join(contents, []byte("\n")), nil
+	return []byte(strings.Join(contents, "\n")), nil
 }
 
 // Save marshalls the hosts file and then saves it to disk.
