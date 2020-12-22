@@ -12,7 +12,7 @@ require (
 	github.com/docker/spdystream v0.0.0-20181023171402-6480d4af844c // indirect
 	github.com/elazarl/goproxy v0.0.0-20191011121108-aa519ddbe484 // indirect
 	github.com/elazarl/goproxy/ext v0.0.0-20191011121108-aa519ddbe484 // indirect
-	github.com/function61/gokit v0.0.0-20201208150714-430c31fdbc6a
+	github.com/function61/gokit v0.0.0-20201222133023-aeb11a5badac
 	github.com/go-logr/logr v0.3.0
 	github.com/golang/protobuf v1.4.3
 	github.com/google/go-cmp v0.5.4
