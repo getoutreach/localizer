@@ -19,6 +19,7 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
+	"os"
 	"os/exec"
 	"runtime"
 
@@ -221,7 +222,7 @@ func (w *worker) CreatePortForward(ctx context.Context, req *CreatePortForwardRe
 
 	// We only need to create alias on darwin, on other platforms
 	// lo0 becomes lo and routes the full /8
-	if runtime.GOOS == "darwin" {
+	if runtime.GOOS == "darwin" && os.Getenv("DISABLE_LOOPBACK_ALIAS") == "" {
 		args := []string{"lo0", "alias", ipAddress.IP.String(), "up"}
 		if err := exec.Command("ifconfig", args...).Run(); err != nil {
 			return errors.Wrap(err, "failed to create ip link")
@@ -328,7 +329,7 @@ func (w *worker) stopPortForward(_ context.Context, conn *PortForwardConnection)
 	if len(conn.IP) > 0 {
 		// If we are on a platform that needs aliases
 		// then we need to remove it
-		if runtime.GOOS == "darwin" {
+		if runtime.GOOS == "darwin" && os.Getenv("DISABLE_LOOPBACK_ALIAS") == "" {
 			ipStr := conn.IP.String()
 			args := []string{"lo0", "-alias", ipStr}
 			if err := exec.Command("ifconfig", args...).Run(); err != nil {
