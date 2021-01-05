@@ -289,7 +289,21 @@ func (f *File) Save(ctx context.Context) error {
 		return fmt.Errorf("can't write, was not loaded from a file")
 	}
 
-	b, err := f.Marshal(ctx)
+	var b []byte
+	var err error
+	if f.fileLocation != "" {
+		f.lock.Lock()
+		// re-read the hosts file to get potential
+		// changes outside of our block
+		b, err := ioutil.ReadFile(f.fileLocation)
+		if err != nil {
+			return err
+		}
+		f.contents = b
+		f.lock.Unlock()
+	}
+
+	b, err = f.Marshal(ctx)
 	if err != nil {
 		return errors.Wrap(err, "failed to marshal hostsfile")
 	}

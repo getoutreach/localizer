@@ -89,13 +89,13 @@ func TestFile_Marshal(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
+	f.clock = clock.NewMock()
 
 	err = f.Load(context.Background())
 	if err != nil {
 		t.Error(errors.Wrap(err, "failed to load valid hosts file"))
 	}
 
-	f.clock = clock.NewMock()
 	b, err := f.Marshal(context.Background())
 	if err != nil {
 		t.Error(errors.Wrap(err, "failed to marshal hosts file"))
@@ -111,13 +111,13 @@ func TestFile_Marshal(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
+	f.clock = clock.NewMock()
 
 	err = f.Load(context.Background())
 	if err != nil {
 		t.Error(errors.Wrap(err, "failed to load valid hosts file"))
 	}
 
-	f.clock = clock.NewMock()
 	b, err = f.Marshal(context.Background())
 	if err != nil {
 		t.Error(errors.Wrap(err, "failed to marshal hosts file"))
@@ -130,6 +130,34 @@ func TestFile_Marshal(t *testing.T) {
 
 	if !reflect.DeepEqual(expected, b) {
 		t.Error("expected: ", cmp.Diff(expected, b))
+	}
+
+	// modify a hosts file outside of our library, ensure the changes
+	// are kept when Marshal'd
+	filePath = "./testdata/load/hosts-with-block.hosts"
+	f, err = New(filePath, "")
+	if err != nil {
+		t.Error(err)
+	}
+	f.clock = clock.NewMock()
+
+	err = f.Load(context.Background())
+	if err != nil {
+		t.Error(errors.Wrap(err, "failed to load valid hosts file"))
+	}
+
+	// append a new entry
+	f.contents = append([]byte(
+		"127.0.0.1 helloworld.name.io\n",
+	), f.contents...)
+
+	b, err = f.Marshal(context.Background())
+	if err != nil {
+		t.Error(errors.Wrap(err, "failed to marshal hosts file"))
+	}
+
+	if !reflect.DeepEqual(b, f.contents) {
+		t.Error("expected: ", cmp.Diff(b, f.contents))
 	}
 }
 
