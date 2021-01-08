@@ -20,7 +20,6 @@ import (
 
 	"github.com/jaredallard/localizer/internal/kevents"
 	"github.com/jaredallard/localizer/internal/kube"
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -75,23 +74,6 @@ type ProxyOpts struct {
 	IPCidr        string
 }
 
-func IndexEndpointsByActivePod(obj interface{}) ([]string, error) {
-	endpoints, ok := obj.(*corev1.Endpoints)
-	if !ok {
-		return nil, errors.New("indexer only works on Endpoints")
-	}
-	var pods []string
-	for _, subset := range endpoints.Subsets {
-		for _, address := range subset.Addresses {
-			if address.TargetRef == nil || address.TargetRef.Kind != PodKind {
-				continue
-			}
-			pods = append(pods, address.TargetRef.Name)
-		}
-	}
-	return pods, nil
-}
-
 // NewProxier creates a new proxier instance
 func NewProxier(ctx context.Context, k kubernetes.Interface, kconf *rest.Config, log logrus.FieldLogger, opts *ProxyOpts) (*Proxier, error) { //nolint:lll
 	svcInformer := kevents.GlobalCache.Core().V1().Services().Informer()
@@ -137,9 +119,7 @@ func NewProxier(ctx context.Context, k kubernetes.Interface, kconf *rest.Config,
 			}
 		},
 	})
-	return p, endpointsInformer.AddIndexers(cache.Indexers{
-		"pods": IndexEndpointsByActivePod,
-	})
+	return p, nil
 }
 
 // Start starts the proxier
@@ -259,7 +239,7 @@ func (p *Proxier) reconcile(key string) error {
 		}
 
 	case PortForwardStatusRunning:
-		if endpoints, err := p.endpointsInformer.GetIndexer().ByIndex("pods", existingForward.Pod.Name); err == nil && len(endpoints) == 0 {
+		if !isActiveEndpoint(existingForward.Pod.Name, endpoints) {
 			p.createPortforward(svc, fmt.Sprintf("endpoints '%s' was removed", existingForward.Pod.Key()))
 		}
 	case PortForwardStatusRecreating:
@@ -349,4 +329,15 @@ func (p *Proxier) List(ctx context.Context) ([]ServiceStatus, error) {
 	}
 
 	return statuses, nil
+}
+
+func isActiveEndpoint(podName string, endpoints *corev1.Endpoints) bool {
+	for _, subset := range endpoints.Subsets {
+		for _, address := range subset.Addresses {
+			if address.TargetRef != nil && address.TargetRef.Kind == PodKind && address.TargetRef.Name == podName {
+				return true
+			}
+		}
+	}
+	return false
 }
