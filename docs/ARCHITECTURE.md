@@ -19,11 +19,15 @@ Among the two features of Localizer, tunnel and expose, there are a bunch of dif
  * `ssh` - Implementation of an SSH client + reverse proxy
 
 Outside of these packages, there is the CLI layer that "glues" all of this together.
-CLI Design
+
+## CLI Design
+
 Localizer has a pretty minimal design for the CLI layer, which lives inside of the cmd directory and uses urfave/cli to implement commands. In general, the principle behind each of these command implementations (separated by name.go) is that they should implement mostly bare minimum formatting or user input logic only. All other logic should be located in a separate package.
 
 All other Localizer commands, such as expose and list, are implemented by talking to the GRPC server.
-GRPC Setup
+
+## GRPC Setup
+
 The CLI is a thin wrapper around two components; the GRPC server and the client. The server is used for the localizer daemon, also starts the Kubernetes VPN (or port-forward manager) aspect of Localizer. This is done by creating a UNIX socket that lives at /var/run/localizer.sock. All of the logic for the GPRC server lives inside of the server package.
 
 The logic for connecting to the server (the client) currently lives in the CLI library, which will eventually be pulled into its own package.
