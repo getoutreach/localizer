@@ -268,7 +268,7 @@ func (p *ServiceForward) Start(ctx context.Context) error { //nolint:funlen
 	ports := make([]string, len(p.Ports))
 	for i, port := range p.Ports {
 		prt := int(port.TargetPort.IntVal)
-		ports[i] = fmt.Sprintf("%d:%d", prt, port.MappedPort)
+		ports[i] = fmt.Sprintf("%d:%d", port.MappedPort, prt)
 		p.log.Debugf("tunneling port %v", ports[i])
 	}
 
