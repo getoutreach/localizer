@@ -3,7 +3,6 @@ module github.com/jaredallard/localizer
 go 1.15
 
 require (
-	github.com/apex/log v1.9.0
 	github.com/asaskevich/govalidator v0.0.0-20200907205600-7a23bdc65eef
 	github.com/benbjohnson/clock v1.1.0
 	github.com/cpuguy83/go-md2man/v2 v2.0.0 // indirect
