@@ -130,7 +130,6 @@ func (c *Client) Start(ctx context.Context, serviceKey string) error {
 			case <-ctx.Done():
 				return
 			case <-t.C:
-				c.log.Debug("sending ssh-keepalive")
 				_, _, err := sshClient.Conn.SendRequest("keepalive@golang.org", true, nil)
 				if err != nil {
 					c.log.WithError(err).Warn("failed to send keep-alive")

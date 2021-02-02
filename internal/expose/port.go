@@ -15,8 +15,8 @@ package expose
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
@@ -33,6 +33,7 @@ import (
 
 const (
 	ExposedPodLabel = "localizer.jaredallard.github.com/exposed"
+	ObjectsPodLabel = "localizer.jaredallard.github.com/objects"
 )
 
 var (
@@ -63,19 +64,27 @@ type ServiceForward struct {
 	Ports       []kube.ResolvedServicePort
 
 	// TODO(jaredallard): support replacing non associated pods?
-	objects map[string]scaledObjectType
+	objects []scaledObjectType
 }
 
 type scaledObjectType struct {
-	corev1.ObjectReference
+	obj interface{}
 
-	Replicas uint
+	*metav1.PartialObjectMetadata `json:"object"`
+
+	// Replicas is the original scale at the time of scale down
+	// for this controller
+	Replicas int `json:"replicas"`
+
+	// Resource is the resource type (REST) for this controller
+	// for example, a Deployment would be deployments
+	Resource string `json:"resource"`
 }
 
 // GetKey() returns a unique, predictable key for the given
 // scaledObjectType capable of being used for caching
 func (s *scaledObjectType) GetKey() string {
-	return strings.ToLower(fmt.Sprintf("%s/%s/%s", s.Kind, s.Namespace, s.Name))
+	return s.GetSelfLink()
 }
 
 func (p *ServiceForward) createServerPortForward(ctx context.Context, po *corev1.Pod, localPort int) (*portforward.PortForwarder, error) {
@@ -97,10 +106,16 @@ func (p *ServiceForward) createServerPod(ctx context.Context) (func(), *corev1.P
 		containerPorts[i] = cp
 	}
 
+	b, err := json.MarshalIndent(p.objects, "", "  ")
+	if err != nil {
+		return func() {}, nil, errors.Wrap(err, "failed to encode object state")
+	}
+
 	// add a label for localizer pods
 	labels := map[string]string{
 		ExposedPodLabel: "true",
 	}
+
 	for k, v := range p.Selector {
 		labels[k] = v
 	}
@@ -110,6 +125,9 @@ func (p *ServiceForward) createServerPod(ctx context.Context) (func(), *corev1.P
 			Namespace:    p.Namespace,
 			GenerateName: fmt.Sprintf("localizer-%s-", p.ServiceName),
 			Labels:       labels,
+			Annotations: map[string]string{
+				ObjectsPodLabel: string(b),
+			},
 		},
 		Spec: corev1.PodSpec{
 			RestartPolicy: corev1.RestartPolicyOnFailure,
@@ -257,7 +275,7 @@ func (p *ServiceForward) Start(ctx context.Context) error { //nolint:funlen
 	// scale down the other resources that powered this service
 	for _, o := range p.objects {
 		p.log.Infof("scaling %s from %d -> 0", o.GetKey(), o.Replicas)
-		if err := p.c.scaleObject(ctx, &o.ObjectReference, uint(0)); err != nil {
+		if err := p.c.scaleObject(ctx, o, 0); err != nil {
 			return errors.Wrap(err, "failed to scale down object")
 		}
 	}
@@ -265,7 +283,7 @@ func (p *ServiceForward) Start(ctx context.Context) error { //nolint:funlen
 		// scale back up the resources that powered this service
 		for _, o := range p.objects {
 			p.log.Infof("scaling %s from 0 -> %d", o.GetKey(), o.Replicas)
-			if err := p.c.scaleObject(context.Background(), &o.ObjectReference, o.Replicas); err != nil {
+			if err := p.c.scaleObject(context.Background(), o, o.Replicas); err != nil {
 				p.log.WithError(err).Warn("failed to scale back up object")
 			}
 		}
