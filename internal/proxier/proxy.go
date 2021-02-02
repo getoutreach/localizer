@@ -252,7 +252,7 @@ func (p *Proxier) reconcile(key string) error {
 func (p *Proxier) createPortforward(svc *corev1.Service, recreate string) {
 	info := ServiceInfo{Namespace: svc.Namespace, Name: svc.Name}
 	// resolve the service ports using endpoints if possible.
-	resolvedPorts, _, err := kube.ResolveServicePorts(svc)
+	resolvedPorts, err := kube.ResolveServicePorts(p.log, svc)
 	if err != nil {
 		return
 	}

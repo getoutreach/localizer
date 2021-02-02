@@ -96,31 +96,13 @@ type ResolvedServicePort struct {
 
 // ResolveServicePorts converts named ports into their true
 // format. TargetPort's that have are named become their integer equivalents
-func ResolveServicePorts(s *corev1.Service) ([]ResolvedServicePort, bool, error) {
+func ResolveServicePorts(log logrus.FieldLogger, s *corev1.Service) ([]ResolvedServicePort, error) {
 	store := kevents.GlobalCache.Core().V1().Endpoints().Informer().GetStore()
-	if store == nil {
-		return nil, false, fmt.Errorf("endpoints store was empty")
-	}
 
 	obj, _, err := store.GetByKey(s.Namespace + "/" + s.Name)
-	if err != nil {
-		return nil, false, errors.Wrap(err, "failed to get endpoints")
-	}
-
 	e, ok := obj.(*corev1.Endpoints)
-	if !ok || len(e.Subsets) == 0 {
-		// TODO: Use the FindControllersForService function to get
-		// the ports from the container definitions
-		// if there are no endpoints, don't resolve, just return them
-		servicePorts := make([]ResolvedServicePort, len(s.Spec.Ports))
-		for i, sp := range s.Spec.Ports {
-			servicePorts[i] = ResolvedServicePort{
-				sp,
-				"",
-				uint(sp.Port),
-			}
-		}
-		return servicePorts, false, nil
+	if !ok || len(e.Subsets) == 0 || err != nil {
+		return ResolveServicePortsFromControllers(log, s)
 	}
 
 	servicePorts := make([]ResolvedServicePort, len(s.Spec.Ports))
@@ -151,7 +133,7 @@ func ResolveServicePorts(s *corev1.Service) ([]ResolvedServicePort, bool, error)
 		}
 	}
 
-	return servicePorts, true, nil
+	return servicePorts, nil
 }
 
 // satisfiesSelector checks if target has all of the k/v pairs in source
@@ -200,6 +182,105 @@ func satisfiesSelector(obj interface{}, matches map[string]string) (bool, error)
 	}
 
 	return true, nil
+}
+
+// ResolveServicePortsFromControllers looks up the controllers of a given service
+// and uses their containerPort declarations to resolve named endpoints of a service
+func ResolveServicePortsFromControllers(log logrus.FieldLogger, s *corev1.Service) ([]ResolvedServicePort, error) { //nolint:funlen
+	controllers, err := FindControllersForService(log, s)
+	if err != nil {
+		return nil, err
+	}
+	if len(controllers) == 0 {
+		return nil, fmt.Errorf("failed to find any controllers, please ensure a deployment or other type exists for this service")
+	}
+
+	// select the first controller, we can't really support multiple ports
+	// without a lot of complexity that doesn't seem warranted
+	controller := controllers[0]
+
+	v, err := conversion.EnforcePtr(controller)
+	if err != nil {
+		return nil, err
+	}
+	err = reflectconversions.EnforceStruct(v)
+	if err != nil {
+		return nil, err
+	}
+
+	v = v.FieldByName("Spec")
+	if !v.IsValid() {
+		return nil, fmt.Errorf("struct lacks field Spec")
+	}
+	err = reflectconversions.EnforceStruct(v)
+	if err != nil {
+		return nil, err
+	}
+
+	v = v.FieldByName("Template")
+	if !v.IsValid() {
+		return nil, fmt.Errorf("struct lacks field Template")
+	}
+	err = reflectconversions.EnforceStruct(v)
+	if err != nil {
+		return nil, err
+	}
+
+	v = v.FieldByName("Spec")
+	if !v.IsValid() {
+		return nil, fmt.Errorf("struct lacks field Spec")
+	}
+	err = reflectconversions.EnforceStruct(v)
+	if err != nil {
+		return nil, err
+	}
+
+	v = v.FieldByName("Containers")
+	if !v.IsValid() {
+		return nil, fmt.Errorf("struct lacks field Spec")
+	}
+
+	containers, ok := v.Interface().([]corev1.Container)
+	if !ok {
+		return nil, fmt.Errorf("expected Containers to be []*corev1.Container, got %v", v.Type())
+	}
+
+	ports := make(map[string]int)
+	for i := range containers {
+		for _, p := range containers[i].Ports {
+			if p.Name == "" {
+				continue
+			}
+
+			ports[p.Name] = int(p.ContainerPort)
+		}
+	}
+
+	resolvedPorts := make([]ResolvedServicePort, len(s.Spec.Ports))
+	for i, p := range s.Spec.Ports {
+		original := ""
+		if p.TargetPort.Type == intstr.String {
+			// iterate over the ports to find what
+			// the named port references
+			// note that the name of the port will be the
+			// service's port name, not the targetPort
+			for name, containerPort := range ports {
+				if name == p.TargetPort.String() {
+					original = p.TargetPort.String()
+					p.TargetPort = intstr.FromInt(containerPort)
+					break
+				}
+			}
+		}
+
+		resolvedPorts[i] = ResolvedServicePort{
+			p,
+			original,
+			uint(p.TargetPort.IntValue()),
+		}
+	}
+
+	return resolvedPorts, nil
 }
 
 // FindControllersForService returns the controllers for a given service.

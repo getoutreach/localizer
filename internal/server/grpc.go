@@ -102,6 +102,7 @@ func (g *GRPCService) Run(ctx context.Context, log logrus.FieldLogger) error {
 	kevents.GlobalCache.Apps().V1().Deployments().Informer()
 	kevents.GlobalCache.Apps().V1().StatefulSets().Informer()
 	kevents.GlobalCache.Core().V1().Services().Informer()
+	kevents.GlobalCache.Core().V1().Endpoints().Informer()
 	kevents.GlobalCache.Core().V1().Pods().Informer()
 
 	h, err := NewServiceHandler(ctx, log, g.opts)

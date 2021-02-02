@@ -12,5 +12,5 @@ var GlobalCache informers.SharedInformerFactory
 
 // ConfigureGlobalCache sets up package wide global cache
 func ConfigureGlobalCache(k kubernetes.Interface, namespace string) {
-	GlobalCache = informers.NewSharedInformerFactoryWithOptions(k, 10*time.Hour, informers.WithNamespace(namespace))
+	GlobalCache = informers.NewSharedInformerFactoryWithOptions(k, 10*time.Minute, informers.WithNamespace(namespace))
 }

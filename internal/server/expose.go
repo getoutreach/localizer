@@ -24,7 +24,6 @@ import (
 	"github.com/jaredallard/localizer/internal/kube"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 
@@ -217,7 +216,7 @@ func (h *GRPCServiceHandler) ExposeService(req *apiv1.ExposeServiceRequest, res 
 		return fmt.Errorf("service had no defined ports")
 	}
 
-	servicePorts, exists, err := kube.ResolveServicePorts(s)
+	servicePorts, err := kube.ResolveServicePorts(log, s)
 	if err != nil {
 		return errors.Wrap(err, "failed to resolve service ports")
 	}
@@ -225,19 +224,6 @@ func (h *GRPCServiceHandler) ExposeService(req *apiv1.ExposeServiceRequest, res 
 	// handle mapped ports
 	if err := mapPorts(req.PortMap, log, servicePorts); err != nil {
 		return err
-	}
-
-	// if we couldn't find endpoints, then we fall back to binding whatever the
-	// public port of the service is if it is named
-	if !exists {
-		for i, sp := range servicePorts {
-			if servicePorts[i].TargetPort.Type == intstr.String {
-				log.Warnf("failed to determine the value of port %s, using public port %d", sp.TargetPort.String(), sp.Port)
-				servicePorts[i].TargetPort = intstr.FromInt(int(sp.Port))
-			}
-		}
-
-		log.Debug("service has no endpoints")
 	}
 
 	return h.exp.Start(servicePorts, req.Namespace, req.Service)
