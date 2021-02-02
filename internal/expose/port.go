@@ -16,7 +16,6 @@ package expose
 import (
 	"context"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
@@ -67,15 +66,17 @@ type ServiceForward struct {
 }
 
 type scaledObjectType struct {
-	corev1.ObjectReference
+	obj interface{}
 
-	Replicas uint
+	meta metav1.Object
+
+	Replicas int
 }
 
 // GetKey() returns a unique, predictable key for the given
 // scaledObjectType capable of being used for caching
 func (s *scaledObjectType) GetKey() string {
-	return strings.ToLower(fmt.Sprintf("%s/%s/%s", s.Kind, s.Namespace, s.Name))
+	return s.meta.GetSelfLink()
 }
 
 func (p *ServiceForward) createServerPortForward(ctx context.Context, po *corev1.Pod, localPort int) (*portforward.PortForwarder, error) {
@@ -257,7 +258,7 @@ func (p *ServiceForward) Start(ctx context.Context) error { //nolint:funlen
 	// scale down the other resources that powered this service
 	for _, o := range p.objects {
 		p.log.Infof("scaling %s from %d -> 0", o.GetKey(), o.Replicas)
-		if err := p.c.scaleObject(ctx, &o.ObjectReference, uint(0)); err != nil {
+		if err := p.c.scaleObject(ctx, o, 0); err != nil {
 			return errors.Wrap(err, "failed to scale down object")
 		}
 	}
@@ -265,7 +266,7 @@ func (p *ServiceForward) Start(ctx context.Context) error { //nolint:funlen
 		// scale back up the resources that powered this service
 		for _, o := range p.objects {
 			p.log.Infof("scaling %s from 0 -> %d", o.GetKey(), o.Replicas)
-			if err := p.c.scaleObject(context.Background(), &o.ObjectReference, o.Replicas); err != nil {
+			if err := p.c.scaleObject(context.Background(), o, o.Replicas); err != nil {
 				p.log.WithError(err).Warn("failed to scale back up object")
 			}
 		}

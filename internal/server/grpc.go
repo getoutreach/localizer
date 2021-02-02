@@ -120,6 +120,11 @@ func (g *GRPCService) Run(ctx context.Context, log logrus.FieldLogger) error {
 			log.WithError(err).Error("grpc server exited")
 		}
 	}()
+
+	// Triggers population, needed for pkg/kube
+	kevents.GlobalCache.Apps().V1().Deployments().Informer()
+	kevents.GlobalCache.Apps().V1().StatefulSets().Informer()
+
 	//start the informers
 	kevents.GlobalCache.Start(ctx.Done())
 	log.Info("Waiting for caches to sync...")

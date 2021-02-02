@@ -271,7 +271,7 @@ func (p *Proxier) createPortforward(svc *corev1.Service, recreate string) {
 			fmt.Sprintf("%s.%s.svc.%s", info.Name, info.Namespace, p.opts.ClusterDomain),
 		},
 	}
-	// hack for basic support of statful sets.
+	// hack for basic support of stateful sets.
 	// grab the first endpoint to build the name. This sucks, but it's
 	// needed for Outreach's usecases. Please remove this.
 	if obj, exists, err := p.endpointsInformer.GetStore().GetByKey(svc.Namespace + "/" + svc.Name); err == nil && exists {
