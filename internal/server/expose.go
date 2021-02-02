@@ -89,9 +89,6 @@ func NewExposer(parentCtx context.Context, k kubernetes.Interface, kconf *rest.C
 	log = log.WithField("component", "exposer")
 
 	e := expose.NewExposer(k, kconf, log)
-	if err := e.Start(parentCtx); err != nil {
-		return nil, err
-	}
 
 	exp := &Exposer{
 		e:            e,

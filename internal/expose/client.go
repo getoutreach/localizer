@@ -42,10 +42,9 @@ type Client struct {
 	kconf *rest.Config
 	log   logrus.FieldLogger
 
-	podStore        cache.Store
-	replicaSetStore cache.Store
-	svcStore        cache.Store
-	rm              meta.RESTMapper
+	podStore cache.Store
+	svcStore cache.Store
+	rm       meta.RESTMapper
 }
 
 // NewExposer returns a new client capable of exposing localports to remote locations
@@ -57,19 +56,16 @@ func NewExposer(k kubernetes.Interface, kconf *rest.Config, log logrus.FieldLogg
 		nil,
 		nil,
 		nil,
-		nil,
 	}
 }
 
 // Start warms up the expose cache and enables running Expose()
 // among other things.
 func (c *Client) Start(ctx context.Context) error {
-	replicaSetInformer := kevents.GlobalCache.Apps().V1().ReplicaSets().Informer()
 	podInformer := kevents.GlobalCache.Core().V1().Pods().Informer()
 	svcInformer := kevents.GlobalCache.Core().V1().Services().Informer()
 
 	c.podStore = podInformer.GetStore()
-	c.replicaSetStore = replicaSetInformer.GetStore()
 	c.svcStore = svcInformer.GetStore()
 
 	groupResources, err := restmapper.GetAPIGroupResources(c.k.Discovery())
@@ -89,7 +85,22 @@ func (c *Client) Start(ctx context.Context) error {
 
 			err := c.k.CoreV1().Pods(p.Namespace).Delete(ctx, p.Name, metav1.DeleteOptions{})
 			if err != nil {
-				log.Warn("failed to remove abandoned localizer pod")
+				log.WithError(err).Warn("failed to remove abandoned localizer pod")
+			}
+
+			var objects []scaledObjectType
+			err = json.Unmarshal([]byte(p.Annotations[ObjectsPodLabel]), &objects)
+			if err != nil {
+				c.log.WithError(err).Warn("failed to ensure controllers were scaled back up")
+				continue
+			}
+
+			for _, obj := range objects {
+				err := c.scaleObject(ctx, obj, obj.Replicas)
+				if err != nil {
+					c.log.WithError(err).WithField("object", obj.GetKey()).Warn("failed to restore controller scale")
+					continue
+				}
 			}
 		}
 	}
@@ -133,19 +144,9 @@ func (c *Client) scaleObject(ctx context.Context, scaledObj scaledObjectType, re
 		return errors.Wrap(err, "failed to marshal scale patch body")
 	}
 
-	mapping, err := c.getMapping(scaledObj.obj)
-	if err != nil {
-		return errors.Wrap(err, "failed to lookup resource")
-	}
-
-	mobj, err := meta.Accessor(scaledObj.obj)
-	if err != nil {
-		return errors.Wrap(err, "failed to get accessor for generic type")
-	}
-
 	// TODO: build client from self link one day
-	req := c.k.AppsV1().RESTClient().Patch(types.JSONPatchType).Resource(mapping.Resource.Resource).
-		Namespace(mobj.GetNamespace()).Name(mobj.GetName()).Body(payloadBytes)
+	req := c.k.AppsV1().RESTClient().Patch(types.JSONPatchType).Resource(scaledObj.Resource).
+		Namespace(scaledObj.GetNamespace()).Name(scaledObj.GetName()).Body(payloadBytes)
 
 	c.log.WithField("url", req.URL().String()).Debug("setting replicas")
 	res := req.Do(ctx)
@@ -193,7 +194,7 @@ func getReplicasFromObject(obj interface{}) (int, error) {
 
 // getServiceControllers finds controllers that create pods for a given service
 // and returns them
-func (c *Client) getServiceControllers(_ context.Context, namespace, serviceName string) (map[string]scaledObjectType, error) {
+func (c *Client) getServiceControllers(_ context.Context, namespace, serviceName string) ([]scaledObjectType, error) {
 	obj, exists, err := c.svcStore.GetByKey(fmt.Sprintf("%s/%s", namespace, serviceName))
 	if err != nil {
 		return nil, err
@@ -212,11 +213,19 @@ func (c *Client) getServiceControllers(_ context.Context, namespace, serviceName
 		return nil, err
 	}
 
-	scaledObjects := make(map[string]scaledObjectType)
+	scaledObjects := make([]scaledObjectType, 0)
 	for _, obj := range objs {
-		mobj, err := meta.Accessor(obj)
+		metaObj, err := meta.Accessor(obj)
 		if err != nil {
 			c.log.WithError(err).Warn("failed to handle object")
+			continue
+		}
+		// Don't store the entire object
+		mobj := meta.AsPartialObjectMetadata(metaObj)
+
+		mapping, err := c.getMapping(obj)
+		if err != nil {
+			c.log.WithError(err).Warn("failed to get controller type")
 			continue
 		}
 
@@ -224,6 +233,7 @@ func (c *Client) getServiceControllers(_ context.Context, namespace, serviceName
 			obj,
 			mobj,
 			0,
+			mapping.Resource.Resource,
 		}
 
 		replicas, err := getReplicasFromObject(obj)
@@ -233,7 +243,7 @@ func (c *Client) getServiceControllers(_ context.Context, namespace, serviceName
 		}
 		scaledObject.Replicas = replicas
 
-		scaledObjects[scaledObject.GetKey()] = scaledObject
+		scaledObjects = append(scaledObjects, scaledObject)
 	}
 
 	return scaledObjects, nil
@@ -253,11 +263,9 @@ func (c *Client) Expose(ctx context.Context, ports []kube.ResolvedServicePort, n
 
 	objects, err := c.getServiceControllers(ctx, namespace, serviceName)
 	if err != nil {
-		// if we failed to find any controllers, we need to assume that
-		// a service have no replicas, and thus won't handle any scale up
-		// scale down operations
+		// service either had no controllers, or we failed to get them. Either way
+		// it's likely not the end of the world
 		c.log.WithError(err).Debug("failed to get controllers")
-		objects = make(map[string]scaledObjectType)
 	}
 
 	log := c.log.WithField("service", fmt.Sprintf("%s/%s", namespace, serviceName))

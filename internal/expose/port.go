@@ -15,6 +15,7 @@ package expose
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -32,6 +33,7 @@ import (
 
 const (
 	ExposedPodLabel = "localizer.jaredallard.github.com/exposed"
+	ObjectsPodLabel = "localizer.jaredallard.github.com/objects"
 )
 
 var (
@@ -62,21 +64,27 @@ type ServiceForward struct {
 	Ports       []kube.ResolvedServicePort
 
 	// TODO(jaredallard): support replacing non associated pods?
-	objects map[string]scaledObjectType
+	objects []scaledObjectType
 }
 
 type scaledObjectType struct {
 	obj interface{}
 
-	meta metav1.Object
+	*metav1.PartialObjectMetadata `json:"object"`
 
-	Replicas int
+	// Replicas is the original scale at the time of scale down
+	// for this controller
+	Replicas int `json:"replicas"`
+
+	// Resource is the resource type (REST) for this controller
+	// for example, a Deployment would be deployments
+	Resource string `json:"resource"`
 }
 
 // GetKey() returns a unique, predictable key for the given
 // scaledObjectType capable of being used for caching
 func (s *scaledObjectType) GetKey() string {
-	return s.meta.GetSelfLink()
+	return s.GetSelfLink()
 }
 
 func (p *ServiceForward) createServerPortForward(ctx context.Context, po *corev1.Pod, localPort int) (*portforward.PortForwarder, error) {
@@ -98,10 +106,16 @@ func (p *ServiceForward) createServerPod(ctx context.Context) (func(), *corev1.P
 		containerPorts[i] = cp
 	}
 
+	b, err := json.MarshalIndent(p.objects, "", "  ")
+	if err != nil {
+		return func() {}, nil, errors.Wrap(err, "failed to encode object state")
+	}
+
 	// add a label for localizer pods
 	labels := map[string]string{
 		ExposedPodLabel: "true",
 	}
+
 	for k, v := range p.Selector {
 		labels[k] = v
 	}
@@ -111,6 +125,9 @@ func (p *ServiceForward) createServerPod(ctx context.Context) (func(), *corev1.P
 			Namespace:    p.Namespace,
 			GenerateName: fmt.Sprintf("localizer-%s-", p.ServiceName),
 			Labels:       labels,
+			Annotations: map[string]string{
+				ObjectsPodLabel: string(b),
+			},
 		},
 		Spec: corev1.PodSpec{
 			RestartPolicy: corev1.RestartPolicyOnFailure,

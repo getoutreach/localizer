@@ -52,11 +52,12 @@ func NewGRPCService(opts *RunOpts) *GRPCService {
 
 // CleanupPreviousInstance attempts to cleanup after a dead localizer instance
 // if a not dead one is found, an error is returned or if it fails to cleanup
-func (g *GRPCService) CleanupPreviousInstance(ctx context.Context) error {
+func (g *GRPCService) CleanupPreviousInstance(ctx context.Context, log logrus.FieldLogger) error {
 	var cancel context.CancelFunc
 	ctx, cancel = context.WithTimeout(ctx, time.Second*10)
 	defer cancel()
 
+	log.Info("checking if an instance of localizer is already running")
 	conn, err := grpc.DialContext(ctx, "unix://"+SocketPath,
 		grpc.WithBlock(), grpc.WithInsecure())
 
@@ -70,6 +71,7 @@ func (g *GRPCService) CleanupPreviousInstance(ctx context.Context) error {
 		}
 	}
 
+	log.Warn("failed to contact existing instance, cleaning up socket")
 	return errors.Wrap(os.Remove(SocketPath), "failed to cleanup socket from old localizer instance")
 }
 
@@ -77,7 +79,7 @@ func (g *GRPCService) CleanupPreviousInstance(ctx context.Context) error {
 func (g *GRPCService) Run(ctx context.Context, log logrus.FieldLogger) error {
 	if _, err := os.Stat(SocketPath); err == nil {
 		// if we found an existing instance, attempt to cleanup after it
-		err = g.CleanupPreviousInstance(ctx)
+		err = g.CleanupPreviousInstance(ctx, log)
 		if err != nil {
 			return err
 		}
@@ -95,6 +97,12 @@ func (g *GRPCService) Run(ctx context.Context, log logrus.FieldLogger) error {
 	}
 
 	g.lis = l
+
+	// Trigger the population of our informers
+	kevents.GlobalCache.Apps().V1().Deployments().Informer()
+	kevents.GlobalCache.Apps().V1().StatefulSets().Informer()
+	kevents.GlobalCache.Core().V1().Services().Informer()
+	kevents.GlobalCache.Core().V1().Pods().Informer()
 
 	h, err := NewServiceHandler(ctx, log, g.opts)
 	if err != nil {
@@ -121,15 +129,15 @@ func (g *GRPCService) Run(ctx context.Context, log logrus.FieldLogger) error {
 		}
 	}()
 
-	// Triggers population, needed for pkg/kube
-	kevents.GlobalCache.Apps().V1().Deployments().Informer()
-	kevents.GlobalCache.Apps().V1().StatefulSets().Informer()
-
 	//start the informers
 	kevents.GlobalCache.Start(ctx.Done())
 	log.Info("Waiting for caches to sync...")
 	kevents.GlobalCache.WaitForCacheSync(ctx.Done())
 	log.Info("Caches synced")
+
+	if err := h.exp.e.Start(ctx); err != nil {
+		log.WithError(err).Error("failed to start exposer")
+	}
 
 	if err := h.p.Start(ctx); err != nil {
 		log.WithError(err).Error("failed to start proxy informers")
