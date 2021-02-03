@@ -99,6 +99,27 @@ type ResolvedServicePort struct {
 func ResolveServicePorts(log logrus.FieldLogger, s *corev1.Service) ([]ResolvedServicePort, error) {
 	store := kevents.GlobalCache.Core().V1().Endpoints().Informer().GetStore()
 
+	hasNamedPorts := false
+	for _, p := range s.Spec.Ports {
+		if p.TargetPort.Type == intstr.String {
+			hasNamedPorts = true
+			break
+		}
+	}
+
+	// Don't try to resolve anything if we don't have named ports
+	if !hasNamedPorts {
+		servicePorts := make([]ResolvedServicePort, len(s.Spec.Ports))
+		for i, sp := range s.Spec.Ports {
+			servicePorts[i] = ResolvedServicePort{
+				sp,
+				"",
+				uint(sp.Port),
+			}
+		}
+		return servicePorts, nil
+	}
+
 	obj, _, err := store.GetByKey(s.Namespace + "/" + s.Name)
 	e, ok := obj.(*corev1.Endpoints)
 	if !ok || len(e.Subsets) == 0 || err != nil {
