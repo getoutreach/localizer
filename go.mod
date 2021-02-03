@@ -16,7 +16,7 @@ require (
 	github.com/golang/protobuf v1.4.3
 	github.com/google/go-cmp v0.5.4
 	github.com/imdario/mergo v0.3.11 // indirect
-	github.com/metal-stack/go-ipam v1.7.0
+	github.com/metal-stack/go-ipam v1.8.1
 	github.com/pkg/errors v0.9.1
 	github.com/sirupsen/logrus v1.7.0
 	github.com/urfave/cli/v2 v2.3.0
