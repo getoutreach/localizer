@@ -6,7 +6,7 @@ jobs:
   test:
     runs-on: ubuntu-latest
     container:
-      image: golang:1.15-alpine
+      image: golang:1.16-alpine
     steps:
       - name: Download OS Dependencies
         run: apk add --no-cache git make bash curl tar gcc libc-dev sudo
