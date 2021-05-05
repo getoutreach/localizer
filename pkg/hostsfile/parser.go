@@ -104,7 +104,7 @@ func (f *File) parseMetadata(line string) (*Metadata, error) {
 }
 
 // Load loads the hosts file into memory, and parses it.
-func (f *File) Load(ctx context.Context) error {
+func (f *File) Load(ctx context.Context) error { //nolint:funlen
 	f.lock.Lock()
 	defer f.lock.Unlock()
 
@@ -210,7 +210,7 @@ func (f *File) generateBlock() (string, error) {
 }
 
 // Marshal renders a hosts file from memory.
-func (f *File) Marshal(ctx context.Context) ([]byte, error) {
+func (f *File) Marshal(ctx context.Context) ([]byte, error) { //nolint:funlen
 	f.lock.Lock()
 	defer f.lock.Unlock()
 
@@ -295,6 +295,7 @@ func (f *File) Save(ctx context.Context) error {
 		f.lock.Lock()
 		// re-read the hosts file to get potential
 		// changes outside of our block
+		//nolint:govet // Why: We're OK shadowing err
 		b, err := ioutil.ReadFile(f.fileLocation)
 		if err != nil {
 			return err
@@ -312,6 +313,7 @@ func (f *File) Save(ctx context.Context) error {
 	f.saveLock.Lock()
 	defer f.saveLock.Unlock()
 
+	//nolint:gosec // We should eventually just use the existing perms here
 	return ioutil.WriteFile(f.fileLocation, b, 0644)
 }
 

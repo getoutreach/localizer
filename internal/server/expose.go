@@ -109,7 +109,7 @@ func getKey(namespace, serviceName string) string {
 	return fmt.Sprintf("%s/%s", namespace, serviceName)
 }
 
-func (e *Exposer) worker() { //nolint:lostcancel
+func (e *Exposer) worker() { //nolint:lostcancel,funlen
 	// when this exits we're done
 	defer close(e.doneChan)
 

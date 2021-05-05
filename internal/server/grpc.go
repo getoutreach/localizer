@@ -76,7 +76,7 @@ func (g *GRPCService) CleanupPreviousInstance(ctx context.Context, log logrus.Fi
 }
 
 // Run starts a grpc server with the internal server handler
-func (g *GRPCService) Run(ctx context.Context, log logrus.FieldLogger) error {
+func (g *GRPCService) Run(ctx context.Context, log logrus.FieldLogger) error { //nolint:funlen
 	if _, err := os.Stat(SocketPath); err == nil {
 		// if we found an existing instance, attempt to cleanup after it
 		err = g.CleanupPreviousInstance(ctx, log)

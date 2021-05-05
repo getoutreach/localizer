@@ -31,7 +31,7 @@ import (
 	"google.golang.org/grpc"
 )
 
-func NewListCommand(_ logrus.FieldLogger) *cli.Command {
+func NewListCommand(_ logrus.FieldLogger) *cli.Command { //nolint:funlen
 	return &cli.Command{
 		Name:        "list",
 		Description: "list all port-forwarded services and their status(es)",

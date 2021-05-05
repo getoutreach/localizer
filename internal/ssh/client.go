@@ -58,13 +58,13 @@ func NewReverseTunnelClient(l logrus.FieldLogger, host string, port int, ports [
 		localPort := 0
 		remotePort := 0
 		if len(ports) == 1 {
-			port, err := strconv.Atoi(ports[0])
+			portInt, err := strconv.Atoi(ports[0])
 			if err != nil {
 				panic(err)
 			}
 
-			localPort = port
-			remotePort = port
+			localPort = portInt
+			remotePort = portInt
 		}
 
 		if len(ports) == 2 {
@@ -89,7 +89,7 @@ func NewReverseTunnelClient(l logrus.FieldLogger, host string, port int, ports [
 
 // Start starts the ssh tunnel. This blocks until
 // all listeners have closed
-func (c *Client) Start(ctx context.Context, serviceKey string) error {
+func (c *Client) Start(ctx context.Context, serviceKey string) error { //nolint:funlen
 	dialer := net.Dialer{
 		Timeout: 10 * time.Second,
 	}
@@ -110,6 +110,7 @@ func (c *Client) Start(ctx context.Context, serviceKey string) error {
 			// TODO(jaredallard): consider randomizing this?
 			ssh.Password("supersecretpassword"),
 		},
+		//nolint:gosec // Why: We're not really caring about what we connect to here.
 		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
 	})
 	if err != nil {

@@ -30,7 +30,7 @@ import (
 	"google.golang.org/grpc"
 )
 
-func NewExposeCommand(log logrus.FieldLogger) *cli.Command {
+func NewExposeCommand(log logrus.FieldLogger) *cli.Command { //nolint:funlen
 	return &cli.Command{
 		Name:        "expose",
 		Description: "Expose ports for a given service to Kubernetes",

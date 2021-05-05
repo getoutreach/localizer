@@ -224,16 +224,19 @@ func (w *worker) CreatePortForward(ctx context.Context, req *CreatePortForwardRe
 	// lo0 becomes lo and routes the full /8
 	if runtime.GOOS == "darwin" && os.Getenv("DISABLE_LOOPBACK_ALIAS") == "" {
 		args := []string{"lo0", "alias", ipAddress.IP.String(), "up"}
+		//nolint:govet // Why: We're OK shadowing err
 		if err := exec.Command("ifconfig", args...).Run(); err != nil {
 			return errors.Wrap(err, "failed to create ip link")
 		}
 	}
 	pf.Hostnames = req.Hostnames
 
+	//nolint:govet // Why: We're OK shadowing err
 	if err := w.dns.AddHosts(ipAddress.IP.String(), req.Hostnames); err != nil {
 		return errors.Wrap(err, "failed to add host entry")
 	}
 
+	//nolint:govet // Why: We're OK shadowing err
 	if err := w.dns.Save(ctx); err != nil {
 		return errors.Wrap(err, "failed to save host changes")
 	}
