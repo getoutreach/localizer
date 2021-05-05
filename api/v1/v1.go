@@ -13,4 +13,4 @@
 // limitations under the License.
 package v1
 
-//go:generate ../../scripts/protoc.sh ./v1.proto
+//go:generate ../../scripts/shell-wrapper.sh protoc.sh ./v1.proto

@@ -1,26 +1,56 @@
 # Binaries for programs and plugins
-bin/
 *.exe
 *.exe~
 *.dll
 *.so
 *.dylib
 
-# Test binary, built with `go test -c`
+# Editors (please update any new editor files in
+# https://github.com/getoutreach/bootstrap/edit/master/pkg/codegen/templates/.gitignore.tpl
+# so every updated project gets it)
+*.swp
+*~
+\#*\#
+.idea/*
+TAGS
+*.sublime-project
+*.sublime-workspace
+.\#*
+
+# Test binary, build with "go test -c"
 *.test
 
 # Output of the go coverage tool, specifically when used with LiteIDE
 *.out
 
-# Dependency directories (remove the comment below to include it)
-vendor/
+# Log files
+*.log
 
-# Ignore our replacements directory for allowing testing of
-# forked go modules
-replacements/
-
-# Build stuff
+# Releases and other binaries
+bin/
 dist/
 
-# debugger
-__debug_bin
+# Don't. Commit. Vendor. Or other package manager dep directories
+node_modules
+vendor
+
+# Fetched by make
+concourse/jsonnet-libs
+
+# pulumi secrets, obtained from vault
+Pulumi.*.yaml
+
+# terraform
+.terraform
+
+# macOS
+.DS_Store
+
+# Ruby gRPC client
+*.gem
+
+# bootstrap libs
+.bootstrap
+
+###Block(extras)
+###EndBlock(extras)

@@ -20,14 +20,14 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/jaredallard/localizer/internal/expose"
-	"github.com/jaredallard/localizer/internal/kube"
+	"github.com/getoutreach/localizer/internal/expose"
+	"github.com/getoutreach/localizer/internal/kube"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 
-	apiv1 "github.com/jaredallard/localizer/api/v1"
+	apiv1 "github.com/getoutreach/localizer/api/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -109,7 +109,7 @@ func getKey(namespace, serviceName string) string {
 	return fmt.Sprintf("%s/%s", namespace, serviceName)
 }
 
-func (e *Exposer) worker() { //nolint:lostcancel
+func (e *Exposer) worker() { //nolint:lostcancel,funlen
 	// when this exits we're done
 	defer close(e.doneChan)
 

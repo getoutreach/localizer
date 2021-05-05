@@ -22,9 +22,9 @@ import (
 	"k8s.io/client-go/rest"
 
 	///StartBlock(imports)
-	apiv1 "github.com/jaredallard/localizer/api/v1"
-	"github.com/jaredallard/localizer/internal/kube"
-	"github.com/jaredallard/localizer/internal/proxier"
+	apiv1 "github.com/getoutreach/localizer/api/v1"
+	"github.com/getoutreach/localizer/internal/kube"
+	"github.com/getoutreach/localizer/internal/proxier"
 	///EndBlock(imports)
 )
 

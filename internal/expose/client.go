@@ -19,9 +19,9 @@ import (
 	"fmt"
 	"reflect"
 
-	"github.com/jaredallard/localizer/internal/kevents"
-	"github.com/jaredallard/localizer/internal/kube"
-	"github.com/jaredallard/localizer/internal/reflectconversions"
+	"github.com/getoutreach/localizer/internal/kevents"
+	"github.com/getoutreach/localizer/internal/kube"
+	"github.com/getoutreach/localizer/internal/reflectconversions"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	appsv1 "k8s.io/api/apps/v1"
@@ -79,7 +79,7 @@ func (c *Client) Start(ctx context.Context) error {
 		p := obj.(*corev1.Pod)
 
 		if p.Labels[ExposedPodLabel] == "true" {
-			key, _ := cache.MetaNamespaceKeyFunc(p)
+			key, _ := cache.MetaNamespaceKeyFunc(p) //nolint:errcheck
 			log := c.log.WithField("pod", key)
 			log.Warn("removing abandoned localizer pod")
 
@@ -194,7 +194,7 @@ func getReplicasFromObject(obj interface{}) (int, error) {
 
 // getServiceControllers finds controllers that create pods for a given service
 // and returns them
-func (c *Client) getServiceControllers(_ context.Context, namespace, serviceName string) ([]scaledObjectType, error) {
+func (c *Client) getServiceControllers(_ context.Context, namespace, serviceName string) ([]scaledObjectType, error) { //nolint:funlen
 	obj, exists, err := c.svcStore.GetByKey(fmt.Sprintf("%s/%s", namespace, serviceName))
 	if err != nil {
 		return nil, err

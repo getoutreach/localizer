@@ -1,3 +1,4 @@
+// Copyright 2021 Outreach.io
 // Copyright 2020 Jared Allard
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -25,14 +26,16 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/jaredallard/localizer/internal/kevents"
-	"github.com/jaredallard/localizer/internal/kube"
-	"github.com/jaredallard/localizer/internal/server"
+	"github.com/getoutreach/localizer/internal/kevents"
+	"github.com/getoutreach/localizer/internal/kube"
+	"github.com/getoutreach/localizer/internal/server"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
 	"k8s.io/klog/v2"
 )
+
+/// Deviation(unbootstrapped): waiting on OSS bootstrap
 
 var Version = "v0.0.0-unset"
 

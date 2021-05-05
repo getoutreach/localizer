@@ -18,8 +18,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/jaredallard/localizer/internal/kevents"
-	"github.com/jaredallard/localizer/internal/kube"
+	"github.com/getoutreach/localizer/internal/kevents"
+	"github.com/getoutreach/localizer/internal/kube"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -184,7 +184,7 @@ func (p *Proxier) processNextWorkItem() bool {
 	return true
 }
 
-func (p *Proxier) reconcile(key string) error {
+func (p *Proxier) reconcile(key string) error { //nolint:funlen
 	o, exists, err := p.svcInformer.GetStore().GetByKey(key)
 	if err != nil {
 		return err
@@ -192,6 +192,7 @@ func (p *Proxier) reconcile(key string) error {
 
 	if !exists {
 		// we don't have the service object anymore, we need to get the namespace/name from the key
+		//nolint:govet // Why: We're OK shadowing err
 		namespace, name, err := cache.SplitMetaNamespaceKey(key)
 		if err != nil {
 			return err
@@ -249,7 +250,7 @@ func (p *Proxier) reconcile(key string) error {
 	return nil
 }
 
-func (p *Proxier) createPortforward(svc *corev1.Service, recreate string) {
+func (p *Proxier) createPortforward(svc *corev1.Service, recreate string) { //nolint:funlen
 	info := ServiceInfo{Namespace: svc.Namespace, Name: svc.Name}
 	// resolve the service ports using endpoints if possible.
 	resolvedPorts, err := kube.ResolveServicePorts(p.log, svc)

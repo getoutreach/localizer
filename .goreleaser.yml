@@ -3,33 +3,24 @@
 before:
   hooks:
     - make dep
-    - make gogenerate
-env_files:
-  # Work path :(
-  github_token: "~/.outreach/github.token"
 builds:
   - main: ./cmd/localizer
     id: &name localizer
     binary: *name
-    ldflags:
-      - '-w -s -X "main.Version=v{{ .Version }}"'
     goos:
       - linux
       - darwin
     goarch:
       - amd64
       - arm64
+    ldflags:
+      - '-w -s -X "github.com/getoutreach/go-outreach/v2/pkg/app.Version=v{{ .Version }}"'
+      - '-X "main.HoneycombTracingKey={{ .Env.HONEYCOMB_APIKEY }}"'
     env:
       - CGO_ENABLED=0
 archives: []
 checksum:
   name_template: "checksums.txt"
-changelog:
-  sort: asc
-  filters:
-    exclude:
-      - '^(docs|test|build|chore)(\(.+?\))?:'
 release:
-  github:
-    owner: jaredallard
-    name: localizer
+  # We handle releasing via semantic-release
+  disable: true

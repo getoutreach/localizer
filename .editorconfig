@@ -8,11 +8,13 @@ insert_final_newline = true
 [Makefile]
 indent_style = tab
 
-[*.{yml,yaml}]
+[*.go]
+indent_style = tab
+indent_size  = 2
+
+[*.{bash,rb,sh,slim,yml,yaml}]
 indent_style = space
 indent_size  = 2
 
-[*.{sh,bash}]
-indent_style = space
-indent_size  = 2
-Terms
+###Block(editorconfig)
+###EndBlock(editorconfig)

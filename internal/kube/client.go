@@ -19,8 +19,8 @@ import (
 	"io/ioutil"
 	"net/http"
 
-	"github.com/jaredallard/localizer/internal/kevents"
-	"github.com/jaredallard/localizer/internal/reflectconversions"
+	"github.com/getoutreach/localizer/internal/kevents"
+	"github.com/getoutreach/localizer/internal/reflectconversions"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
@@ -96,7 +96,7 @@ type ResolvedServicePort struct {
 
 // ResolveServicePorts converts named ports into their true
 // format. TargetPort's that have are named become their integer equivalents
-func ResolveServicePorts(log logrus.FieldLogger, s *corev1.Service) ([]ResolvedServicePort, error) {
+func ResolveServicePorts(log logrus.FieldLogger, s *corev1.Service) ([]ResolvedServicePort, error) { //nolint:funlen
 	store := kevents.GlobalCache.Core().V1().Endpoints().Informer().GetStore()
 
 	hasNamedPorts := false

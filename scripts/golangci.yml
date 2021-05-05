@@ -1,0 +1,120 @@
+linters-settings:
+  errcheck:
+    check-blank: true
+  govet:
+    check-shadowing: true
+  golint:
+    min-confidence: 0
+  gocyclo:
+    min-complexity: 25
+  maligned:
+    suggest-new: true
+  dupl:
+    threshold: 100
+  goconst:
+    min-len: 3
+    min-occurrences: 3
+  depguard:
+    list-type: blacklist
+    #    packages-with-error-messages:
+    #      errors: "Please use github.com/pkg/errors instead"
+  misspell:
+    locale: US
+  lll:
+    line-length: 140
+  gocritic:
+    enabled-tags:
+      - diagnostic
+      - experimental
+      - opinionated
+      - performance
+      - style
+    disabled-checks:
+      - whyNoLint
+  funlen:
+    lines: 50
+    statements: 50
+
+linters:
+  # Inverted configuration with enable-all and disable is not scalable during updates of golangci-lint.
+  disable-all: true
+  # - asciicheck       # Checks that your code does not contain non-ASCII identifiers.
+  # - dupl
+  # - gocognit         # Computes and checks the cognitive complexity of functions.
+  # - gochecknoglobals # Checks that no globals are present in Go code.
+  # - godox            # Tool for detection of FIXME, TODO and other comment keywords.
+  # - gofumpt          # Gofumpt checks whether code was gofumpt-ed.
+  # - goheader         # Checks if file header matches to pattern.
+  # - gomodguard       # Allow and block list linter for direct Go module dependencies.
+  # - goprintffuncname # Checks that printf-like functions are named with `f` at the end.
+  # - interfacer       # Linter that suggests narrower interface types.
+  # - lll              # Reports long lines.
+  # - maligned         # Tool to detect Go structs that would take less memory if their fields were sorted.
+  # - noctx            # Finds sending http request without context.Context.
+  # - prealloc         # Finds slice declarations that could potentially be preallocated.
+  # - rowserrcheck     # Checks whether Err of rows is checked successfully.
+  # - sqlclosecheck    # Checks that sql.Rows and sql.Stmt are closed.
+  # - stylecheck       # Stylecheck is a replacement for golint.
+  # - testpackage      # Linter that makes you use a separate _test package.
+  # - wsl              # Whitespace Linter - Forces you to use empty lines.
+  enable:
+    - bodyclose
+    - deadcode
+    - depguard
+    - dogsled
+    - errcheck
+    - exhaustive # Checks exhaustiveness of enum switch statements.
+    - exportloopref # Checks for pointers to enclosing loop variables.
+    - funlen
+    - gochecknoinits
+    - goconst
+    - gocritic
+    - gocyclo
+    - gofmt
+    - goimports
+    - golint
+    - gosec
+    - gosimple
+    - govet
+    - ineffassign
+    - misspell
+    - nakedret
+    - scopelint
+    - staticcheck
+    - structcheck
+    - typecheck
+    - unconvert
+    - unparam
+    - unused
+    - varcheck
+    - whitespace
+
+issues:
+  # List of regexps of issue texts to exclude, empty list by default.
+  # But independently from this option we use default exclude patterns,
+  # it can be disabled by `exclude-use-default: false`. To list all
+  # excluded by default patterns execute `golangci-lint run --help`
+  exclude:
+    - abcdef
+
+  # Excluding configuration per-path, per-linter, per-text and per-source
+  exclude-rules:
+    # Exclude some linters from running on tests files.
+    - path: _test\.go
+      linters:
+        - gocyclo
+        - errcheck
+        - dupl
+        - gosec
+        - funlen
+        - gochecknoglobals # Globals in test files are tolerated.
+    # This rule is buggy and breaks on our `///Block` lines.  Disable for now.
+    - linters:
+        - gocritic
+      text: "commentFormatting: put a space"
+
+# golangci.com configuration
+# https://github.com/golangci/golangci/wiki/Configuration
+service:
+  prepare:
+    - echo "here I can run custom commands, but no preparation needed for this repo"

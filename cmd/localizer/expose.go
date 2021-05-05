@@ -1,3 +1,4 @@
+// Copyright 2021 Outreach.io
 // Copyright 2020 Jared Allard
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -21,15 +22,15 @@ import (
 	"strings"
 	"time"
 
-	apiv1 "github.com/jaredallard/localizer/api/v1"
-	"github.com/jaredallard/localizer/internal/server"
+	apiv1 "github.com/getoutreach/localizer/api/v1"
+	"github.com/getoutreach/localizer/internal/server"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
 	"google.golang.org/grpc"
 )
 
-func NewExposeCommand(log logrus.FieldLogger) *cli.Command {
+func NewExposeCommand(log logrus.FieldLogger) *cli.Command { //nolint:funlen
 	return &cli.Command{
 		Name:        "expose",
 		Description: "Expose ports for a given service to Kubernetes",
