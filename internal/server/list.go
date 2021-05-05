@@ -18,7 +18,7 @@ import (
 	"fmt"
 	"strings"
 
-	apiv1 "github.com/jaredallard/localizer/api/v1"
+	apiv1 "github.com/getoutreach/localizer/api/v1"
 )
 
 func (h *GRPCServiceHandler) List(ctx context.Context, req *apiv1.ListRequest) (*apiv1.ListResponse, error) {

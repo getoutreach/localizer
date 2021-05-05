@@ -1,0 +1,33 @@
+preset: conventionalcommits
+branches:
+  - name: master
+  - name: main
+plugins:
+  - - "@semantic-release/commit-analyzer"
+    - releaseRules:
+        - type: revert
+          release: patch
+        - type: perf
+          release: patch
+  # Block major version upgrades due to us not supporting them that well. This can
+  # be disabled by setting releaseOptions.allowMajorVersions, but be warned this
+  # is not well supported for services. Please talk to #dev-tooling-support before
+  # doing this to save yourself from issues.
+  - - "@semantic-release/exec"
+    # We use generateNotesCmd instead of verifyConditionsCmd because it has access
+    # to last/nextRelease due to when the step runs.
+    - generateNotesCmd: |-
+        ./scripts/shell-wrapper.sh major-release-checker.js ${lastRelease.version} ${nextRelease.version}
+  # Build the binaries
+  - - "@semantic-release/exec"
+    # We use generateNotesCmd instead of a different step because it has access
+    # to last/nextRelease due to when the step runs.
+    - generateNotesCmd: "make release APP_VERSION=${nextRelease.version}"
+
+  # This creates fancy release notes in our Github release
+  - "@semantic-release/release-notes-generator"
+  # Create the Github Release
+  - - "@semantic-release/github"
+    - assets:
+        - "dist/*.tar.gz"
+        - "dist/checksums.txt"

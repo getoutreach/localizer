@@ -1,3 +1,4 @@
+// Copyright 2021 Outreach.io
 // Copyright 2020 Jared Allard
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -22,8 +23,8 @@ import (
 	"text/tabwriter"
 	"time"
 
-	apiv1 "github.com/jaredallard/localizer/api/v1"
-	"github.com/jaredallard/localizer/internal/server"
+	apiv1 "github.com/getoutreach/localizer/api/v1"
+	"github.com/getoutreach/localizer/internal/server"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"

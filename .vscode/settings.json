@@ -1,25 +1,33 @@
 {
   "go.lintTool": "golangci-lint",
-  "go.lintFlags": [
-    "--fast",
-  ],
+  "go.lintFlags": [],
   "go.formatTool": "goimports",
+  "go.useLanguageServer": true,
   "go.alternateTools": {
-    "golangci-lint": "${workspaceFolder}/scripts/golangci-lint.sh",
-    "goimports": "${workspaceFolder}/scripts/goimports.sh",
-    "dlv": "${workspaceFolder}/scripts/dlv-sudo.sh"
+    // This makes sure we use the correct version
+    // of golangci-lint in our editors.
+    "golangci-lint": "${workspaceFolder}/.bootstrap/shell/golangci-lint.sh"
   },
-  "shellcheck.customArgs": [
-    "-P",
-    "SCRIPTDIR",
-    "-x"
-  ],
+  "go.buildTags": "or_dev",
+  "go.testTags": "or_test,or_int,or_e2e",
+  // This prevents 99% of issues with linters :)
   "editor.formatOnSave": true,
-  "shellformat.path": "./scripts/shfmt.sh",
+  "shellcheck.customArgs": ["-P", "SCRIPTDIR", "-x"],
+  "shellformat.path": "./.bootstrap/shell/shfmt.sh",
   "[dockerfile]": {
     "editor.defaultFormatter": "ms-azuretools.vscode-docker"
   },
+  "[proto3]": {
+    "editor.defaultFormatter": "zxh404.vscode-proto3"
+  },
   "[yaml]": {
     "editor.defaultFormatter": "redhat.vscode-yaml"
+  },
+  "gopls": {
+    "build.buildFlags": ["-tags=or_test,or_dev,or_e2e,or_int"]
   }
+  // Please consider contributing back all added
+  // settings to bootstrap!
+  ///Block(settings)
+  ///EndBlock(settings)
 }

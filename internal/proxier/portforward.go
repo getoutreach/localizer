@@ -23,7 +23,7 @@ import (
 	"os/exec"
 	"runtime"
 
-	"github.com/jaredallard/localizer/pkg/hostsfile"
+	"github.com/getoutreach/localizer/pkg/hostsfile"
 	"github.com/metal-stack/go-ipam"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"

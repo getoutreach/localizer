@@ -18,8 +18,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/jaredallard/localizer/internal/kevents"
-	"github.com/jaredallard/localizer/internal/kube"
+	"github.com/getoutreach/localizer/internal/kevents"
+	"github.com/getoutreach/localizer/internal/kube"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/wait"

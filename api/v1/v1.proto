@@ -15,12 +15,11 @@
 syntax = "proto3";
 
 package api.v1;
-option go_package = "github.com/jaredallard/localizer/api/v1";
-
+option go_package = "github.com/getoutreach/localizer/api/v1";
 
 message ExposeServiceRequest {
-  string namespace = 1;
-  string service = 2;
+  string namespace         = 1;
+  string service           = 2;
   repeated string port_map = 3;
 }
 
@@ -30,14 +29,14 @@ message PingRequest {}
 
 message StopExposeRequest {
   string namespace = 1;
-  string service = 2;
+  string service   = 2;
 }
 
 enum ConsoleLevel {
   CONSOLE_LEVEL_UNSPECIFIED = 0;
-  CONSOLE_LEVEL_INFO = 1;
-  CONSOLE_LEVEL_WARN = 2;
-  CONSOLE_LEVEL_ERROR = 3;
+  CONSOLE_LEVEL_INFO        = 1;
+  CONSOLE_LEVEL_WARN        = 2;
+  CONSOLE_LEVEL_ERROR       = 3;
 }
 
 // This will be turned into ConsoleResponse to be generic probably some
@@ -53,12 +52,12 @@ message ConsoleResponse {
 message PingResponse {}
 
 message ListService {
-  string namespace = 1;
-  string name = 2;
-  string status = 3;
-  string endpoint = 4;
-  string status_reason = 5;
-  string ip = 6;
+  string namespace      = 1;
+  string name           = 2;
+  string status         = 3;
+  string endpoint       = 4;
+  string status_reason  = 5;
+  string ip             = 6;
   repeated string ports = 7;
 }
 

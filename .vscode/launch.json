@@ -11,12 +11,9 @@
       "mode": "auto",
       "program": "${workspaceFolder}/cmd/localizer",
       "env": {
-        "DEBUG_AS_ROOT": "true",
+        "DEBUG_AS_ROOT": "true"
       },
-      "args": [
-        "--log-level",
-        "debug"
-      ]
+      "args": ["--log-level", "debug"]
     }
   ]
 }

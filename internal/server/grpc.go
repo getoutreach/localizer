@@ -25,8 +25,8 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 
-	apiv1 "github.com/jaredallard/localizer/api/v1"
-	"github.com/jaredallard/localizer/internal/kevents"
+	apiv1 "github.com/getoutreach/localizer/api/v1"
+	"github.com/getoutreach/localizer/internal/kevents"
 )
 
 const SocketPath = "/var/run/localizer.sock"

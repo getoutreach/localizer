@@ -20,8 +20,8 @@ import (
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
-	"github.com/jaredallard/localizer/internal/kube"
-	"github.com/jaredallard/localizer/internal/ssh"
+	"github.com/getoutreach/localizer/internal/kube"
+	"github.com/getoutreach/localizer/internal/ssh"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
