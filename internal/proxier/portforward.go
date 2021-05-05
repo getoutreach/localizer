@@ -218,7 +218,7 @@ func (w *worker) CreatePortForward(ctx context.Context, req *CreatePortForwardRe
 	if err != nil {
 		return errors.Wrap(err, "failed to allocate IP")
 	}
-	pf.IP = ipAddress.IP
+	pf.IP = ipAddress.IP.IPAddr().IP
 
 	// We only need to create alias on darwin, on other platforms
 	// lo0 becomes lo and routes the full /8
