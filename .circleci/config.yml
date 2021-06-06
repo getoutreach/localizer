@@ -125,15 +125,19 @@ jobs:
                 name: Configuring Golang SSH
                 command: |-
                   git config --global url."git@github.com:".insteadOf "https://github.com/"
+            - run:
+                name: Setup $CACHE_VERSION Environment Variable
+                command: |-
+                  echo "$CACHE_VERSION" >> cache-version.txt
             - restore_cache:
                 keys:
-                  - v1-release-node-cache-{{ checksum "package.json" }}
-                  - v1-release-node-cache-
+                  - release-node-cache-{{ checksum "cache-version.txt" }}-{{ checksum "package.json" }}
+                  - release-node-cache-{{ checksum "cache-version.txt" }}
             - run:
                 name: Install semantic-release Dependencies
                 command: buildevents cmd $CIRCLE_WORKFLOW_ID $STEP_SPAN_ID install-sem-release-dependencies -- yarn --frozen-lockfile
             - save_cache:
-                key: v1-release-node-cache-{{  checksum "package.json" }}
+                key: release-node-cache-{{ checksum "cache-version.txt" }}-{{  checksum "package.json" }}
                 paths:
                   - node_modules
             - run:
@@ -195,15 +199,19 @@ jobs:
                 name: Configuring Golang SSH
                 command: |-
                   git config --global url."git@github.com:".insteadOf "https://github.com/"
+            - run:
+                name: Setup $CACHE_VERSION Environment Variable
+                command: |-
+                  echo "$CACHE_VERSION" >> cache-version.txt
             - restore_cache:
                 keys:
-                  - v1-release-node-cache-{{ checksum "package.json" }}
-                  - v1-release-node-cache-
+                  - release-node-cache-{{ checksum "cache-version.txt" }}-{{ checksum "package.json" }}
+                  - release-node-cache-{{ checksum "cache-version.txt" }}
             - run:
                 name: Install semantic-release Dependencies
                 command: buildevents cmd $CIRCLE_WORKFLOW_ID $STEP_SPAN_ID install-sem-release-dependencies -- yarn --frozen-lockfile
             - save_cache:
-                key: v1-release-node-cache-{{  checksum "package.json" }}
+                key: release-node-cache-{{ checksum "cache-version.txt" }}-{{  checksum "package.json" }}
                 paths:
                   - node_modules
             - run:
