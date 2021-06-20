@@ -52,5 +52,8 @@ Pulumi.*.yaml
 # bootstrap libs
 .bootstrap
 
+# CircleCI cache version
+/cache-version.txt
+
 ###Block(extras)
 ###EndBlock(extras)
