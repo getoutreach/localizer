@@ -24,7 +24,7 @@ import (
 	"time"
 
 	apiv1 "github.com/getoutreach/localizer/api/v1"
-	"github.com/getoutreach/localizer/internal/server"
+	"github.com/getoutreach/localizer/pkg/localizer"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
@@ -37,20 +37,18 @@ func NewListCommand(_ logrus.FieldLogger) *cli.Command { //nolint:funlen
 		Description: "list all port-forwarded services and their status(es)",
 		Usage:       "list",
 		Action: func(c *cli.Context) error {
-			if _, err := os.Stat(server.SocketPath); os.IsNotExist(err) {
+			if !localizer.IsRunning() {
 				return fmt.Errorf("localizer daemon not running (run localizer by itself?)")
 			}
 
 			ctx, cancel := context.WithTimeout(c.Context, 30*time.Second)
 			defer cancel()
 
-			conn, err := grpc.DialContext(ctx, "unix://"+server.SocketPath,
-				grpc.WithBlock(), grpc.WithInsecure())
+			client, err := localizer.Connect(ctx, grpc.WithBlock(), grpc.WithInsecure())
 			if err != nil {
-				return errors.Wrap(err, "failed to talk to localizer daemon")
+				return errors.Wrap(err, "failed to connect to localizer daemon")
 			}
 
-			client := apiv1.NewLocalizerServiceClient(conn)
 			resp, err := client.List(ctx, &apiv1.ListRequest{})
 			if err != nil {
 				return err

@@ -56,14 +56,11 @@ func (g *GRPCService) CleanupPreviousInstance(ctx context.Context, log logrus.Fi
 	defer cancel()
 
 	log.Info("checking if an instance of localizer is already running")
-	conn, err := grpc.DialContext(ctx, fmt.Sprintf("unix://%s", localizer.Socket),
-		grpc.WithBlock(), grpc.WithInsecure())
+	client, err := localizer.Connect(ctx, grpc.WithBlock(), grpc.WithInsecure())
 
 	// if we made a connection, see if it's responding to pings
 	// eventually we can expose useful information here?
 	if err == nil {
-		client := localizer.Connect(conn)
-
 		if _, err := client.Ping(ctx, &apiv1.PingRequest{}); err == nil {
 			return fmt.Errorf("localizer instance is already running")
 		}

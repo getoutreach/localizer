@@ -3,9 +3,12 @@
 package localizer
 
 import (
+	"context"
+	"fmt"
 	"os"
 
 	apiv1 "github.com/getoutreach/localizer/api/v1"
+	"github.com/pkg/errors"
 	"google.golang.org/grpc"
 )
 
@@ -24,6 +27,11 @@ func IsRunning() bool {
 
 // Connect returns a new instance of LocalizerServiceClient given a gRPC client
 // connection (returned from grpc.Dial*).
-func Connect(clientConn *grpc.ClientConn) apiv1.LocalizerServiceClient {
-	return apiv1.NewLocalizerServiceClient(clientConn)
+func Connect(ctx context.Context, opts ...grpc.DialOption) (apiv1.LocalizerServiceClient, error) {
+	clientConn, err := grpc.DialContext(ctx, fmt.Sprintf("unix://%s", Socket), opts...)
+	if err != nil {
+		return nil, errors.Wrap(err, "dial localizer")
+	}
+
+	return apiv1.NewLocalizerServiceClient(clientConn), nil
 }

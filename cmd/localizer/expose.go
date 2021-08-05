@@ -18,12 +18,11 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"os"
 	"strings"
 	"time"
 
 	apiv1 "github.com/getoutreach/localizer/api/v1"
-	"github.com/getoutreach/localizer/internal/server"
+	"github.com/getoutreach/localizer/pkg/localizer"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
@@ -54,7 +53,7 @@ func NewExposeCommand(log logrus.FieldLogger) *cli.Command { //nolint:funlen
 			serviceNamespace := split[0]
 			serviceName := split[1]
 
-			if _, err := os.Stat(server.SocketPath); os.IsNotExist(err) {
+			if !localizer.IsRunning() {
 				return fmt.Errorf("localizer daemon not running (run localizer by itself?)")
 			}
 
@@ -62,13 +61,11 @@ func NewExposeCommand(log logrus.FieldLogger) *cli.Command { //nolint:funlen
 			defer cancel()
 
 			log.Info("connecting to localizer daemon")
-			conn, err := grpc.DialContext(ctx, "unix://"+server.SocketPath,
-				grpc.WithBlock(), grpc.WithInsecure())
-			if err != nil {
-				return errors.Wrap(err, "failed to talk to localizer daemon")
-			}
 
-			client := apiv1.NewLocalizerServiceClient(conn)
+			client, err := localizer.Connect(ctx, grpc.WithBlock(), grpc.WithInsecure())
+			if err != nil {
+				return errors.Wrap(err, "failed to connect to localizer daemon")
+			}
 
 			var stream apiv1.LocalizerService_ExposeServiceClient
 			if c.Bool("stop") {
