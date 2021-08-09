@@ -66,7 +66,7 @@ func NewExposeCommand(log logrus.FieldLogger) *cli.Command { //nolint:funlen
 			if err != nil {
 				return errors.Wrap(err, "failed to connect to localizer daemon")
 			}
-			defer closer()
+			defer closer() //nolint:errcheck // Why: Nothing we can really do about the error that comes from closing the gRPC client connection.
 
 			var stream api.LocalizerService_ExposeServiceClient
 			if c.Bool("stop") {

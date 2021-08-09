@@ -65,7 +65,7 @@ message ListResponse {
   repeated ListService services = 1;
 }
 
-message Empty{}
+message Empty {}
 
 message StableResponse {
   bool stable = 1;

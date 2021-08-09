@@ -57,7 +57,7 @@ func (g *GRPCService) CleanupPreviousInstance(ctx context.Context, log logrus.Fi
 
 	log.Info("checking if an instance of localizer is already running")
 	client, closer, err := localizer.Connect(ctx, grpc.WithBlock(), grpc.WithInsecure())
-	defer closer()
+	defer closer() //nolint:errcheck // Why: Nothing we can really do about the error that comes from closing the gRPC client connection.
 
 	// if we made a connection, see if it's responding to pings
 	// eventually we can expose useful information here?
