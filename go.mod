@@ -12,7 +12,7 @@ require (
 	github.com/function61/gokit v0.0.0-20210402130425-341c2c9ecfd0
 	github.com/go-logr/logr v0.4.0
 	github.com/go-sql-driver/mysql v1.6.0 // indirect
-	github.com/google/go-cmp v0.5.5
+	github.com/google/go-cmp v0.5.6
 	github.com/gorilla/mux v1.8.0 // indirect
 	github.com/imdario/mergo v0.3.12 // indirect
 	github.com/mattn/go-sqlite3 v2.0.3+incompatible // indirect
