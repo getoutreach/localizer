@@ -22,7 +22,7 @@ import (
 	"k8s.io/client-go/rest"
 
 	///StartBlock(imports)
-	apiv1 "github.com/getoutreach/localizer/api/v1"
+	"github.com/getoutreach/localizer/api"
 	"github.com/getoutreach/localizer/internal/kube"
 	"github.com/getoutreach/localizer/internal/proxier"
 	///EndBlock(imports)
@@ -33,7 +33,7 @@ import (
 
 type GRPCServiceHandler struct {
 	log logrus.FieldLogger
-	apiv1.UnimplementedLocalizerServiceServer
+	api.UnimplementedLocalizerServiceServer
 
 	///StartBlock(grpcConfig)
 	k     kubernetes.Interface

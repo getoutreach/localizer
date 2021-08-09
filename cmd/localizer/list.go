@@ -23,7 +23,7 @@ import (
 	"text/tabwriter"
 	"time"
 
-	apiv1 "github.com/getoutreach/localizer/api/v1"
+	"github.com/getoutreach/localizer/api"
 	"github.com/getoutreach/localizer/pkg/localizer"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -44,12 +44,13 @@ func NewListCommand(_ logrus.FieldLogger) *cli.Command { //nolint:funlen
 			ctx, cancel := context.WithTimeout(c.Context, 30*time.Second)
 			defer cancel()
 
-			client, err := localizer.Connect(ctx, grpc.WithBlock(), grpc.WithInsecure())
+			client, closer, err := localizer.Connect(ctx, grpc.WithBlock(), grpc.WithInsecure())
 			if err != nil {
 				return errors.Wrap(err, "failed to connect to localizer daemon")
 			}
+			defer closer()
 
-			resp, err := client.List(ctx, &apiv1.ListRequest{})
+			resp, err := client.List(ctx, &api.ListRequest{})
 			if err != nil {
 				return err
 			}

@@ -18,16 +18,16 @@ import (
 	"fmt"
 	"strings"
 
-	apiv1 "github.com/getoutreach/localizer/api/v1"
+	"github.com/getoutreach/localizer/api"
 )
 
-func (h *GRPCServiceHandler) List(ctx context.Context, req *apiv1.ListRequest) (*apiv1.ListResponse, error) {
+func (h *GRPCServiceHandler) List(ctx context.Context, req *api.ListRequest) (*api.ListResponse, error) {
 	statuses, err := h.p.List(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	services := make([]*apiv1.ListService, len(statuses))
+	services := make([]*api.ListService, len(statuses))
 	for i := range statuses {
 		s := &statuses[i]
 
@@ -47,7 +47,7 @@ func (h *GRPCServiceHandler) List(ctx context.Context, req *apiv1.ListRequest) (
 			}
 		}
 
-		services[i] = &apiv1.ListService{
+		services[i] = &api.ListService{
 			Namespace:    s.ServiceInfo.Namespace,
 			Name:         s.ServiceInfo.Name,
 			Endpoint:     s.Endpoint.Name,
@@ -58,5 +58,5 @@ func (h *GRPCServiceHandler) List(ctx context.Context, req *apiv1.ListRequest) (
 		}
 	}
 
-	return &apiv1.ListResponse{Services: services}, nil
+	return &api.ListResponse{Services: services}, nil
 }

@@ -15,7 +15,7 @@
 syntax = "proto3";
 
 package api.v1;
-option go_package = "github.com/getoutreach/localizer/api/v1";
+option go_package = "github.com/getoutreach/localizer/api";
 
 message ExposeServiceRequest {
   string namespace         = 1;
@@ -65,9 +65,17 @@ message ListResponse {
   repeated ListService services = 1;
 }
 
+message Empty {}
+
+message StableResponse {
+  bool stable = 1;
+}
+
 service LocalizerService {
   rpc ExposeService(ExposeServiceRequest) returns (stream ConsoleResponse) {}
   rpc StopExpose(StopExposeRequest) returns (stream ConsoleResponse) {}
   rpc List(ListRequest) returns (ListResponse) {}
   rpc Ping(PingRequest) returns (PingResponse) {}
+  rpc Kill(Empty) returns (Empty) {}
+  rpc Stable(Empty) returns (StableResponse) {}
 }

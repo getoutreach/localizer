@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"os"
 
-	apiv1 "github.com/getoutreach/localizer/api/v1"
+	"github.com/getoutreach/localizer/api"
 	"github.com/pkg/errors"
 	"google.golang.org/grpc"
 )
@@ -27,11 +27,13 @@ func IsRunning() bool {
 
 // Connect returns a new instance of LocalizerServiceClient given a gRPC client
 // connection (returned from grpc.Dial*).
-func Connect(ctx context.Context, opts ...grpc.DialOption) (apiv1.LocalizerServiceClient, error) {
+func Connect(ctx context.Context, opts ...grpc.DialOption) (client api.LocalizerServiceClient, closer func(), err error) {
 	clientConn, err := grpc.DialContext(ctx, fmt.Sprintf("unix://%s", Socket), opts...)
 	if err != nil {
-		return nil, errors.Wrap(err, "dial localizer")
+		return nil, nil, errors.Wrap(err, "dial localizer")
 	}
 
-	return apiv1.NewLocalizerServiceClient(clientConn), nil
+	return api.NewLocalizerServiceClient(clientConn), func() {
+		_ = clientConn.Close() //nolint:errcheck // Why: We can't do anything about an error regarding closing the client connection. We eat the error here so we don't have to nolint on every call.
+	}, nil
 }

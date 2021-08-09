@@ -122,6 +122,20 @@ func NewProxier(ctx context.Context, k kubernetes.Interface, kconf *rest.Config,
 	return p, nil
 }
 
+// IsStable is a pass-through function to *worker.isStable. This is mostly to
+// determine if the initial queue has been drained by checking if the worker
+// that the proxier is using has created, deleted, or updated a port-forward
+// in the last 2 seconds.
+func (p *Proxier) IsStable() bool {
+	if p.worker == nil {
+		// Proxier hasn't actually finished being created yet, definitely not
+		// stable.
+		return false
+	}
+
+	return p.worker.isStable()
+}
+
 // Start starts the proxier
 // TODO: replace raw cluster domain with options struct, maybe also
 // move into NewProxier
