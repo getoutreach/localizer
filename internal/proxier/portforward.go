@@ -22,6 +22,8 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
+	"sync"
+	"time"
 
 	"github.com/getoutreach/localizer/pkg/hostsfile"
 	"github.com/metal-stack/go-ipam"
@@ -49,6 +51,13 @@ type worker struct {
 
 	// portForwards are existing port-forwards
 	portForwards map[string]*PortForwardConnection
+
+	// lastTouchTime is the the worker has done any work, whether it
+	// be creating, releasing, or updating port-forwards. The mutex
+	// proceeding it is used to protect this value from concurrent
+	// access.
+	lastTouchTime time.Time
+	touchMu       sync.Mutex
 }
 
 // NewPortForwarder creates a new port-forward worker that handles
@@ -85,15 +94,16 @@ func NewPortForwarder(ctx context.Context, k kubernetes.Interface,
 	reqChan := make(chan PortForwardRequest, 1024)
 
 	w := &worker{
-		k:            k,
-		rest:         r,
-		log:          log,
-		ippool:       ipamInstance,
-		ipCidr:       prefix.Cidr,
-		dns:          hosts,
-		reqChan:      reqChan,
-		doneChan:     doneChan,
-		portForwards: make(map[string]*PortForwardConnection),
+		k:             k,
+		rest:          r,
+		log:           log,
+		ippool:        ipamInstance,
+		ipCidr:        prefix.Cidr,
+		dns:           hosts,
+		reqChan:       reqChan,
+		doneChan:      doneChan,
+		portForwards:  make(map[string]*PortForwardConnection),
+		lastTouchTime: time.Now(),
 	}
 
 	go w.Start(ctx)
@@ -138,6 +148,26 @@ func (w *worker) Start(ctx context.Context) {
 			}
 		}
 	}
+}
+
+// touch notes that the worker is being touched by the proxier.
+func (w *worker) touch() {
+	w.touchMu.Lock()
+	defer w.touchMu.Unlock()
+
+	w.lastTouchTime = time.Now()
+}
+
+// isStable returns true if the worker hasn't been touched in 2 seconds or
+// longer, and returns false otherwise. This was inteded to be used to denote
+// some sort of "readiness", as the worker will be constantly creating
+// port-forwards when starting up, draining the initial queue created by
+// the proxier.
+func (w *worker) isStable() bool {
+	w.touchMu.Lock()
+	defer w.touchMu.Unlock()
+
+	return time.Since(w.lastTouchTime) >= time.Second*2
 }
 
 // getPodForService finds the first available endpoint for a given service
@@ -187,6 +217,9 @@ func (w *worker) CreatePortForward(ctx context.Context, req *CreatePortForwardRe
 	if _, ok := w.portForwards[serviceKey]; ok && !req.Recreate {
 		return fmt.Errorf("already have a port-forward for this service")
 	}
+
+	// The worker is doing meaningful work, not a no-op, note this.
+	w.touch()
 
 	if req.Recreate {
 		log.Infof("recreating port-forward due to: %v", req.RecreateReason)
@@ -381,6 +414,9 @@ func (w *worker) DeletePortForward(ctx context.Context, req *DeletePortForwardRe
 	if w.portForwards[serviceKey] == nil {
 		return nil
 	}
+
+	// The worker is doing meaningful work, not a no-op, note this.
+	w.touch()
 
 	if err := w.stopPortForward(ctx, w.portForwards[serviceKey]); err != nil {
 		log.WithError(err).Warn("failed to cleanup port-forward")

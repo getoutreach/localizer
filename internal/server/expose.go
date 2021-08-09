@@ -27,7 +27,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 
-	apiv1 "github.com/getoutreach/localizer/api/v1"
+	"github.com/getoutreach/localizer/api"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -197,11 +197,11 @@ func (e *Exposer) Start(ports []kube.ResolvedServicePort, namespace, serviceName
 	return nil
 }
 
-func (h *GRPCServiceHandler) StopExpose(req *apiv1.StopExposeRequest, res apiv1.LocalizerService_StopExposeServer) error {
+func (h *GRPCServiceHandler) StopExpose(req *api.StopExposeRequest, res api.LocalizerService_StopExposeServer) error {
 	return h.exp.Close(req.Namespace, req.Service)
 }
 
-func (h *GRPCServiceHandler) ExposeService(req *apiv1.ExposeServiceRequest, res apiv1.LocalizerService_ExposeServiceServer) error {
+func (h *GRPCServiceHandler) ExposeService(req *api.ExposeServiceRequest, res api.LocalizerService_ExposeServiceServer) error {
 	log := h.log
 	ctx := h.ctx
 

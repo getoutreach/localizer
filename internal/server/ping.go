@@ -16,9 +16,9 @@ package server
 import (
 	"context"
 
-	apiv1 "github.com/getoutreach/localizer/api/v1"
+	"github.com/getoutreach/localizer/api"
 )
 
-func (h *GRPCServiceHandler) Ping(ctx context.Context, req *apiv1.PingRequest) (*apiv1.PingResponse, error) {
-	return &apiv1.PingResponse{}, nil
+func (h *GRPCServiceHandler) Ping(ctx context.Context, req *api.PingRequest) (*api.PingResponse, error) {
+	return &api.PingResponse{}, nil
 }

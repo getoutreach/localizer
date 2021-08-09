@@ -25,7 +25,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 
-	apiv1 "github.com/getoutreach/localizer/api/v1"
+	"github.com/getoutreach/localizer/api"
 	"github.com/getoutreach/localizer/internal/kevents"
 	"github.com/getoutreach/localizer/pkg/localizer"
 )
@@ -56,12 +56,13 @@ func (g *GRPCService) CleanupPreviousInstance(ctx context.Context, log logrus.Fi
 	defer cancel()
 
 	log.Info("checking if an instance of localizer is already running")
-	client, err := localizer.Connect(ctx, grpc.WithBlock(), grpc.WithInsecure())
+	client, closer, err := localizer.Connect(ctx, grpc.WithBlock(), grpc.WithInsecure())
+	defer closer()
 
 	// if we made a connection, see if it's responding to pings
 	// eventually we can expose useful information here?
 	if err == nil {
-		if _, err := client.Ping(ctx, &apiv1.PingRequest{}); err == nil {
+		if _, err := client.Ping(ctx, &api.PingRequest{}); err == nil {
 			return fmt.Errorf("localizer instance is already running")
 		}
 	}
@@ -107,7 +108,7 @@ func (g *GRPCService) Run(ctx context.Context, log logrus.FieldLogger) error { /
 
 	g.srv = grpc.NewServer()
 	reflection.Register(g.srv)
-	apiv1.RegisterLocalizerServiceServer(g.srv, h)
+	api.RegisterLocalizerServiceServer(g.srv, h)
 
 	// handle closing the server
 	go func() {
@@ -117,7 +118,7 @@ func (g *GRPCService) Run(ctx context.Context, log logrus.FieldLogger) error { /
 	}()
 
 	// One day Serve() will accept a context?
-	log.Infof("starting GRPC server on unix://'%s'", localizer.Socket)
+	log.Infof("starting GRPC server on unix://%s", localizer.Socket)
 	go func() {
 		err := g.srv.Serve(g.lis)
 		if err != nil {

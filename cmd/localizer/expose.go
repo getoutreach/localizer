@@ -21,7 +21,7 @@ import (
 	"strings"
 	"time"
 
-	apiv1 "github.com/getoutreach/localizer/api/v1"
+	"github.com/getoutreach/localizer/api"
 	"github.com/getoutreach/localizer/pkg/localizer"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -62,21 +62,22 @@ func NewExposeCommand(log logrus.FieldLogger) *cli.Command { //nolint:funlen
 
 			log.Info("connecting to localizer daemon")
 
-			client, err := localizer.Connect(ctx, grpc.WithBlock(), grpc.WithInsecure())
+			client, closer, err := localizer.Connect(ctx, grpc.WithBlock(), grpc.WithInsecure())
 			if err != nil {
 				return errors.Wrap(err, "failed to connect to localizer daemon")
 			}
+			defer closer()
 
-			var stream apiv1.LocalizerService_ExposeServiceClient
+			var stream api.LocalizerService_ExposeServiceClient
 			if c.Bool("stop") {
 				log.Info("sending stop expose request to daemon")
-				stream, err = client.StopExpose(ctx, &apiv1.StopExposeRequest{
+				stream, err = client.StopExpose(ctx, &api.StopExposeRequest{
 					Namespace: serviceNamespace,
 					Service:   serviceName,
 				})
 			} else {
 				log.Info("sending expose request to daemon")
-				stream, err = client.ExposeService(ctx, &apiv1.ExposeServiceRequest{
+				stream, err = client.ExposeService(ctx, &api.ExposeServiceRequest{
 					PortMap:   c.StringSlice("map"),
 					Namespace: serviceNamespace,
 					Service:   serviceName,
@@ -96,10 +97,10 @@ func NewExposeCommand(log logrus.FieldLogger) *cli.Command { //nolint:funlen
 
 				logger := log.Info
 				switch res.Level {
-				case apiv1.ConsoleLevel_CONSOLE_LEVEL_INFO, apiv1.ConsoleLevel_CONSOLE_LEVEL_UNSPECIFIED:
-				case apiv1.ConsoleLevel_CONSOLE_LEVEL_WARN:
+				case api.ConsoleLevel_CONSOLE_LEVEL_INFO, api.ConsoleLevel_CONSOLE_LEVEL_UNSPECIFIED:
+				case api.ConsoleLevel_CONSOLE_LEVEL_WARN:
 					logger = log.Warn
-				case apiv1.ConsoleLevel_CONSOLE_LEVEL_ERROR:
+				case api.ConsoleLevel_CONSOLE_LEVEL_ERROR:
 					logger = log.Error
 				}
 
