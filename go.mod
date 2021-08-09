@@ -21,7 +21,6 @@ require (
 	github.com/sirupsen/logrus v1.8.1
 	github.com/urfave/cli/v2 v2.3.0
 	golang.org/x/crypto v0.0.0-20210503195802-e9a32991a82e
-	golang.org/x/net v0.0.0-20210505024714-0287a6fb4125 // indirect
 	golang.org/x/oauth2 v0.0.0-20210427180440-81ed05c6b58c // indirect
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c // indirect
 	golang.org/x/sys v0.0.0-20210630005230-0f9fa26af87c // indirect
@@ -29,13 +28,12 @@ require (
 	google.golang.org/genproto v0.0.0-20210505142820-a42aa055cf76 // indirect
 	google.golang.org/grpc v1.37.0
 	google.golang.org/protobuf v1.26.0
-	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b // indirect
 
 	// kubernetes deps
-	k8s.io/api v0.21.0
-	k8s.io/apimachinery v0.21.0
+	k8s.io/api v0.22.0
+	k8s.io/apimachinery v0.22.0
 	k8s.io/client-go v0.21.0
-	k8s.io/klog/v2 v2.8.0
+	k8s.io/klog/v2 v2.9.0
 )
 
 replace k8s.io/client-go => github.com/jaredallard/client-go v0.21.0-jaredallard
