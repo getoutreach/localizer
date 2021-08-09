@@ -48,7 +48,7 @@ func NewListCommand(_ logrus.FieldLogger) *cli.Command { //nolint:funlen
 			if err != nil {
 				return errors.Wrap(err, "failed to connect to localizer daemon")
 			}
-			defer closer() //nolint:errcheck // Why: Nothing we can really do about the error that comes from closing the gRPC client connection.
+			defer closer()
 
 			resp, err := client.List(ctx, &api.ListRequest{})
 			if err != nil {
