@@ -3,8 +3,8 @@ linters-settings:
     check-blank: true
   govet:
     check-shadowing: true
-  golint:
-    min-confidence: 0
+  revive:
+    confidence: 0
   gocyclo:
     min-complexity: 25
   maligned:
@@ -72,14 +72,13 @@ linters:
     - gocyclo
     - gofmt
     - goimports
-    - golint
+    - revive
     - gosec
     - gosimple
     - govet
     - ineffassign
-    - misspell
+    # - misspell        # The reason we're disabling this right now is because it uses 1/2 of the memory of the run.
     - nakedret
-    - scopelint
     - staticcheck
     - structcheck
     - typecheck
