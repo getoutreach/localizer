@@ -299,11 +299,6 @@ workflows:
           context:
             - docker-registry
             - buildevents
-          filters:
-            # This enables running test when a tag is created.
-            # This still runs on each branch.
-            tags:
-              only: /v\d+(\.\d+)*(-.*)*/
       - trigger_documentation:
           context:
             - docker-registry
