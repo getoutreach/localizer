@@ -10,7 +10,7 @@ require (
 	github.com/elazarl/goproxy v0.0.0-20210110162100-a92cc753f88e // indirect
 	github.com/elazarl/goproxy/ext v0.0.0-20210110162100-a92cc753f88e // indirect
 	github.com/function61/gokit v0.0.0-20210402130425-341c2c9ecfd0
-	github.com/go-logr/logr v0.4.0
+	github.com/go-logr/logr v1.0.0
 	github.com/go-sql-driver/mysql v1.6.0 // indirect
 	github.com/google/go-cmp v0.5.5
 	github.com/gorilla/mux v1.8.0 // indirect
@@ -35,7 +35,7 @@ require (
 	k8s.io/api v0.21.0
 	k8s.io/apimachinery v0.21.0
 	k8s.io/client-go v0.21.0
-	k8s.io/klog/v2 v2.8.0
+	k8s.io/klog/v2 v2.20.0
 )
 
 replace k8s.io/client-go => github.com/jaredallard/client-go v0.21.0-jaredallard
