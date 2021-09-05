@@ -12,3 +12,6 @@ updates:
       interval: "daily"
     ignore:
       - dependency-name: "*"
+
+  ###Block(dependabotPackageManagers)
+  ###EndBlock(dependabotPackageManagers)
