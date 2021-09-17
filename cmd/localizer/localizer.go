@@ -106,7 +106,7 @@ func main() { //nolint:funlen
 			NewExposeCommand(log),
 		},
 		Before: func(c *cli.Context) error {
-			sigC := make(chan os.Signal)
+			sigC := make(chan os.Signal, 1)
 			signal.Notify(sigC, os.Interrupt, syscall.SIGTERM)
 			go func() {
 				sig := <-sigC
