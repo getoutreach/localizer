@@ -64,7 +64,7 @@ type worker struct {
 // creating port-forwards and destroying port-forwards.
 //nolint:gocritic,golint // We're OK not naming these.
 func NewPortForwarder(ctx context.Context, k kubernetes.Interface,
-	r *rest.Config, log logrus.FieldLogger, opts *ProxyOpts) (chan<- PortForwardRequest, <-chan struct{}, *worker, error) {
+	r *rest.Config, log logrus.FieldLogger, opts *ProxyOpts) (chan<- PortForwardRequest, <-chan struct{}, *worker, error) { //nolint:revive // Why: It's okay that we're returning an unexported type, that is by design.
 	ipamInstance := ipam.New()
 
 	_, cidr, err := net.ParseCIDR(opts.IPCidr)
