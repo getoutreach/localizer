@@ -37,7 +37,7 @@ require (
 	// kubernetes deps
 	k8s.io/api v0.21.0
 	k8s.io/apimachinery v0.21.0
-	k8s.io/client-go v0.21.0
+	k8s.io/client-go v0.22.2
 	k8s.io/klog/v2 v2.8.0
 	k8s.io/utils v0.0.0-20210111153108-fddb29f9d009 // indirect
 )
