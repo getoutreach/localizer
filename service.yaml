@@ -5,3 +5,4 @@ versions:
   go: 1.16.2
 commands:
   - localizer
+oss: true
