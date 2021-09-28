@@ -312,10 +312,8 @@ func (w *worker) CreatePortForward(ctx context.Context, req *CreatePortForwardRe
 			err := fw.ForwardPorts()
 
 			// if context was canceled (exiting) then we can ignore the error
-			select {
-			case <-ctx.Done():
+			if ctx.Err() != nil {
 				return
-			default:
 			}
 
 			// otherwise, recreate it
