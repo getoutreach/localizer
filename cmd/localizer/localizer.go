@@ -18,6 +18,8 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net/http"
+	_ "net/http/pprof"
 	"os"
 	"os/signal"
 	"os/user"
@@ -53,6 +55,12 @@ func main() { //nolint:funlen
 
 		log.Out = io.MultiWriter(os.Stderr, tmpFile)
 	}
+
+	go func() {
+		if err := http.ListenAndServe("127.0.0.1:8080", http.DefaultServeMux); err != nil {
+			log.WithError(err).Error("error running http server")
+		}
+	}()
 
 	// this prevents the CLI from clobbering context cancellation
 	cli.OsExiter = func(code int) {
