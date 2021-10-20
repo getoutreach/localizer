@@ -1,4 +1,4 @@
-golang 1.16.2
+golang 1.17.1
 terraform 0.13.5
 ###Block(toolver)
 ###EndBlock(toolver)

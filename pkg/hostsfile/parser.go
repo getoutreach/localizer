@@ -19,8 +19,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net"
+	"os"
 	"sort"
 	"strings"
 	"sync"
@@ -36,8 +38,10 @@ type File struct {
 
 	// if this came from a file, this will be populated
 	fileLocation string
-	contents     []byte
-	blockName    string
+	fileInfo     os.FileInfo
+
+	contents  []byte
+	blockName string
 
 	lock     sync.Mutex
 	saveLock sync.Mutex
@@ -79,13 +83,25 @@ func New(fileLocation, sectionName string) (*File, error) {
 		fileLocation = "/etc/hosts"
 	}
 
-	b, err := ioutil.ReadFile(fileLocation)
+	hostF, err := os.Open(fileLocation)
+	if err != nil {
+		return nil, err
+	}
+	defer hostF.Close()
+
+	info, err := hostF.Stat()
+	if err != nil {
+		return nil, err
+	}
+
+	b, err := io.ReadAll(hostF)
 	if err != nil {
 		return nil, err
 	}
 
 	f := NewWithContents(sectionName, b)
 	f.fileLocation = fileLocation
+	f.fileInfo = info
 
 	return f, nil
 }
@@ -285,6 +301,10 @@ func (f *File) Marshal(ctx context.Context) ([]byte, error) { //nolint:funlen
 
 // Save marshalls the hosts file and then saves it to disk.
 func (f *File) Save(ctx context.Context) error {
+	// ensure we don't write to the file at the same time
+	f.saveLock.Lock()
+	defer f.saveLock.Unlock()
+
 	if f.fileLocation == "" {
 		return fmt.Errorf("can't write, was not loaded from a file")
 	}
@@ -293,14 +313,11 @@ func (f *File) Save(ctx context.Context) error {
 	var err error
 	if f.fileLocation != "" {
 		f.lock.Lock()
-		// re-read the hosts file to get potential
-		// changes outside of our block
-		//nolint:govet // Why: We're OK shadowing err
-		b, err := ioutil.ReadFile(f.fileLocation)
+		contents, err := ioutil.ReadFile(f.fileLocation)
 		if err != nil {
 			return err
 		}
-		f.contents = b
+		f.contents = contents
 		f.lock.Unlock()
 	}
 
@@ -309,12 +326,7 @@ func (f *File) Save(ctx context.Context) error {
 		return errors.Wrap(err, "failed to marshal hostsfile")
 	}
 
-	// ensure we don't write to the file at the same time
-	f.saveLock.Lock()
-	defer f.saveLock.Unlock()
-
-	//nolint:gosec // We should eventually just use the existing perms here
-	return ioutil.WriteFile(f.fileLocation, b, 0644)
+	return ioutil.WriteFile(f.fileLocation, b, f.fileInfo.Mode())
 }
 
 // AddHosts adds a line into the hosts file for the given hosts to resolve
