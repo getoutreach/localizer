@@ -34,7 +34,7 @@ jobs:
   test: # runs not using Workflows must have a build job as entry point
     docker: # run the steps with Docker
       # CircleCI Go images available at: https://hub.docker.com/r/cimg/go
-      - image: gcr.io/outreach-docker/bootstrap/testbed:1.16.2
+      - image: gcr.io/outreach-docker/bootstrap/testbed:1.17.1
         auth:
           username: _json_key
           password: $GCLOUD_SERVICE_ACCOUNT
@@ -105,7 +105,7 @@ jobs:
 
   release-dryrun:
     docker:
-      - image: gcr.io/outreach-docker/bootstrap/testbed:1.16.2
+      - image: gcr.io/outreach-docker/bootstrap/testbed:1.17.1
         auth:
           username: _json_key
           password: $GCLOUD_SERVICE_ACCOUNT
@@ -179,7 +179,7 @@ jobs:
                   export CIRCLE_BRANCH=$OLD_CIRCLE_BRANCH
   release:
     docker:
-      - image: gcr.io/outreach-docker/bootstrap/testbed:1.16.2
+      - image: gcr.io/outreach-docker/bootstrap/testbed:1.17.1
         auth:
           username: _json_key
           password: $GCLOUD_SERVICE_ACCOUNT
@@ -224,7 +224,7 @@ jobs:
 
   trigger_documentation:
     docker:
-      - image: gcr.io/outreach-docker/bootstrap/testbed:1.16.2
+      - image: gcr.io/outreach-docker/bootstrap/testbed:1.17.1
         auth:
           username: _json_key
           password: $GCLOUD_SERVICE_ACCOUNT

@@ -1,8 +1,6 @@
 name: localizer
 reportingTeam: cia-dev-tooling
 library: true
-versions:
-  go: 1.16.2
 commands:
   - localizer
 oss: true
