@@ -9,7 +9,7 @@ require (
 	github.com/davecgh/go-spew v1.1.1
 	github.com/elazarl/goproxy v0.0.0-20210110162100-a92cc753f88e // indirect
 	github.com/function61/gokit v0.0.0-20210402130425-341c2c9ecfd0
-	github.com/go-logr/logr v0.4.0
+	github.com/go-logr/logr v1.2.0
 	github.com/go-sql-driver/mysql v1.6.0 // indirect
 	github.com/google/go-cmp v0.5.6
 	github.com/google/gofuzz v1.2.0 // indirect
@@ -37,7 +37,7 @@ require (
 	k8s.io/api v0.21.0
 	k8s.io/apimachinery v0.21.0
 	k8s.io/client-go v0.21.0
-	k8s.io/klog/v2 v2.8.0
+	k8s.io/klog/v2 v2.30.0
 	k8s.io/utils v0.0.0-20210111153108-fddb29f9d009 // indirect
 )
 
