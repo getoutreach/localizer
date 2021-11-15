@@ -34,7 +34,7 @@ linters-settings:
     disabled-checks:
       - whyNoLint
   funlen:
-    lines: 50
+    lines: 500
     statements: 50
 
 linters:
