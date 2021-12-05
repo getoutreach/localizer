@@ -15,4 +15,7 @@ if [[ ! -e $libDir ]] || [[ $existingVersion != "$version" ]] || [[ ! -e "$libDi
 
   git clone -q --single-branch --branch "$version" git@github.com:getoutreach/devbase "$libDir" >/dev/null
   echo -n "$version" >"$libDir/.version"
+
+  # Don't let devbase be confused by the existence of one there :(
+  rm "$libDir/service.yaml"
 fi

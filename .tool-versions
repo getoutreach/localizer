@@ -1,4 +1,11 @@
 golang 1.17.1
 terraform 0.13.5
+# Note: This version of node is just for bootstrap tooling
+# not for actual usage of node clients (if they exist) for
+# this service.
+nodejs 16.13.0
+# Note: Versions in this block override the above. Be EXTREMELY
+# CAREFUL with this. If you override a standard version you are
+# reducing compatibility guarantees.
 ###Block(toolver)
 ###EndBlock(toolver)
