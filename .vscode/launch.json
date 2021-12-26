@@ -5,15 +5,16 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Launch (root)",
+      "name": "Launch Debug Server",
       "type": "go",
       "request": "launch",
-      "mode": "auto",
-      "program": "${workspaceFolder}/cmd/localizer",
-      "env": {
-        "DEBUG_AS_ROOT": "true"
-      },
-      "args": ["--log-level", "debug"]
+      "mode": "debug",
+      "envFile": "${workspaceRoot}/.vscode/private.env",
+      "go.testEnvFile": "${workspaceRoot}/.vscode/private.env",
+      "program": "${workspaceRoot}/cmd/localizer/",
+      "buildFlags": "-tags=or_dev"
     }
+    ///Block(vscodeLaunchConfigs)
+    ///EndBlock(vscodeLaunchConfigs)
   ]
 }

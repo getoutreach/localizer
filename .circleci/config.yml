@@ -1,5 +1,9 @@
 version: 2.1
+orbs:
+  shared: getoutreach/shared@1.40.0
 
+# DEPRECATED: Use the devbase orb instead:
+# https://github.com/getoutreach/devbase/tree/main/orbs/shared
 commands:
   with_job_span:
     parameters:
@@ -7,261 +11,74 @@ commands:
         type: steps
     steps:
       - run:
-          name: Creating span for job
-          command: |-
-            echo "STEP_START=$(date +%s)" >> $BASH_ENV
-            echo "STEP_SPAN_ID=$(echo $CIRCLE_JOB | sum | cut -f 1 -d \ )" >> $BASH_ENV
+          name: DEPRECATION NOTICE
+          command: echo "with_job_span is deprecated and should be removed"
       - steps: << parameters.steps >>
-      - run:
-          name: Finishing span for job
-          command: buildevents step "$CIRCLE_WORKFLOW_ID" "$STEP_SPAN_ID" "$STEP_START" "$CIRCLE_JOB"
-          when: always
 
 jobs:
   ###Block(circleJobs)
   ###EndBlock(circleJobs)
-  send_traces:
+
+  test:
+    executor:
+      name: shared/testbed-docker
     docker:
-      - image: gcr.io/outreach-docker/buildevents:latest
+      - image: gcr.io/outreach-docker/bootstrap/ci:stable
         auth:
           username: _json_key
           password: $GCLOUD_SERVICE_ACCOUNT
-    steps:
-      - run:
-          name: Watch for workflow to finish
-          command: /tmp/buildevents watch $CIRCLE_WORKFLOW_ID
-
-  test: # runs not using Workflows must have a build job as entry point
-    docker: # run the steps with Docker
-      # CircleCI Go images available at: https://hub.docker.com/r/cimg/go
-      - image: gcr.io/outreach-docker/bootstrap/testbed:1.17.1
-        auth:
-          username: _json_key
-          password: $GCLOUD_SERVICE_ACCOUNT
-    # directory where steps are run.
-    working_directory: ~/localizer
-
-    environment: # environment variables for the build itself
-      TEST_RESULTS: /tmp/test-results # path to where test results will be saved
-      GOPRIVATE: github.com/getoutreach/*
-      GOPROXY: https://proxy.golang.org
+    environment:
       ###Block(testEnvVars)
       ###EndBlock(testEnvVars)
-
-    steps: # steps that comprise the build job
-      - with_job_span:
-          steps:
-            # adds the ssh key that Wheatley put here for us.  Ask Wheatley on slack to "setup circle for <project_name>"
-            # see https://outreach-io.atlassian.net/wiki/spaces/EN/pages/701596137/Services+Checklist for the setup process
-            - add_ssh_keys
-            - checkout
-            - run:
-                name: Ensure tests directory exists
-                command: mkdir -p "$TEST_RESULTS"
-
-            - restore_cache: # restores saved cache if no changes are detected since last run
-                # Read about caching dependencies: https://circleci.com/docs/2.0/caching/
-                keys:
-                  # looks for the cache for this go.sum
-                  - v2-pkg-cache-{{ checksum "go.sum" }}
-                  # fallback to the latest cached versions
-                  - v2-pkg-cache-
-
-            # we make this a seperate step to prevent obscure SSH error messages
-            - run:
-                name: Install Dependencies
-                command: buildevents cmd $CIRCLE_WORKFLOW_ID $STEP_SPAN_ID install-go-dependencies -- make dep
-
-            - run:
-                name: Run unit tests
-                # Store the results of our tests in the $TEST_RESULTS directory
-                command:
-                  buildevents cmd $CIRCLE_WORKFLOW_ID $STEP_SPAN_ID unit-tests --
-                  make test | tee ${TEST_RESULTS}/go-test.out
-
-            - run:
-                name: Upload Code Coverage
-                command: |
-                  if [[ -n "$COVERALLS_TOKEN" ]]; then
-                    buildevents cmd $CIRCLE_WORKFLOW_ID $STEP_SPAN_ID upload-code-coverage -- \
-                      goveralls -coverprofile=/tmp/coverage.out -service=circle-ci -repotoken=$COVERALLS_TOKEN;
-                  fi
-
-            - save_cache:
-                key: v2-pkg-cache-{{ checksum "go.sum" }}
-                paths:
-                  - "~/go/pkg"
-
-            - store_artifacts: # Upload test coverage for display in Artifacts: https://circleci.com/docs/2.0/artifacts/
-                path: /tmp/coverage.out
-                destination: raw-coverage-profile
-
-            - store_artifacts: # Upload test summary for display in Artifacts: https://circleci.com/docs/2.0/artifacts/
-                path: /tmp/test-results
-                destination: raw-test-output
-
-            - store_test_results: # Upload test results for display in Test Summary: https://circleci.com/docs/2.0/collect-test-data/
-                path: /tmp/test-results
+    steps:
+      - shared/setup_environment
+      - run:
+          name: Wait for Infrastructure to be Ready
+          command: ./scripts/shell-wrapper.sh ci/testing/wait-for-infra.sh
+      - shared/with_go_cache
+      - run:
+          name: Run unit tests
+          # Store the results of our tests in the $TEST_RESULTS directory
+          command: make test | tee ${TEST_RESULTS}/go-test.out
+      - run:
+          name: Upload Code Coverage
+          command: ./scripts/shell-wrapper.sh ci/testing/coveralls.sh test
+      - shared/save_go_cache # We save at the end because binaries are included with this
+      - shared/upload_test_results # Uploads to CircleCI
 
   release-dryrun:
-    docker:
-      - image: gcr.io/outreach-docker/bootstrap/testbed:1.17.1
-        auth:
-          username: _json_key
-          password: $GCLOUD_SERVICE_ACCOUNT
-    environment:
-      GOPRIVATE: github.com/getoutreach/*
-      GOPROXY: https://proxy.golang.org
+    executor:
+      name: shared/testbed-docker
+      docker_tag: stable
     steps:
-      - with_job_span:
-          steps:
-            - setup_remote_docker:
-                docker_layer_caching: true
-                version: 19.03.13
-            - checkout
-            - add_ssh_keys
-            - run:
-                name: Setup npm Authentication
-                command: echo "//registry.npmjs.org/:_authToken=$NPM_TOKEN" >> ~/.npmrc
-            - run:
-                name: Configuring Golang SSH
-                command: |-
-                  git config --global url."git@github.com:".insteadOf "https://github.com/"
-            - run:
-                name: Setup $CACHE_VERSION Environment Variable
-                command: |-
-                  echo "$CACHE_VERSION" >> cache-version.txt
-            - restore_cache:
-                keys:
-                  - release-node-cache-{{ checksum "cache-version.txt" }}-{{ checksum "package.json" }}
-                  - release-node-cache-{{ checksum "cache-version.txt" }}
-            - run:
-                name: Install semantic-release Dependencies
-                command: buildevents cmd $CIRCLE_WORKFLOW_ID $STEP_SPAN_ID install-sem-release-dependencies -- yarn --frozen-lockfile
-            - save_cache:
-                key: release-node-cache-{{ checksum "cache-version.txt" }}-{{  checksum "package.json" }}
-                paths:
-                  - node_modules
-            - run:
-                name: Release (Dry-run)
-                command: |-
-                  # Make https://github.com/pvdlg/env-ci/blob/master/services/circleci.js
-                  # think we're not on a PR.
-
-                  # Store these and set them after
-                  OLD_CIRCLE_PR_NUMBER=$CIRCLE_PR_NUMBER
-                  OLD_CIRCLE_PULL_REQUEST=$CIRCLE_PULL_REQUEST
-                  OLD_CI_PULL_REQUEST=$CI_PULL_REQUEST
-                  OLD_CIRCLE_BRANCH=$CIRCLE_BRANCH
-
-                  # Fetch the API URL for usage later.
-                  # 19 comes from the length of https://github.com/
-                  export CIRCLE_PR_API_URL=$(echo "https://api.github.com/repos/${CIRCLE_PULL_REQUEST:19}" | sed "s/\/pull\//\/pulls\//")
-
-                  # Remove evidence of us being on a PR.
-                  unset CIRCLE_PR_NUMBER
-                  unset CIRCLE_PULL_REQUEST
-                  unset CI_PULL_REQUEST
-
-                  # Fetch the base branch from the API, since CircleCI doesn't expose it.
-                  export CIRCLE_BRANCH=$(curl -s -H "Authorization: token ${OUTREACH_GITHUB_TOKEN}" "$CIRCLE_PR_API_URL" | jq -r '.base.ref')
-
-                  # Act like we're on the base branch.
-                  git branch -D "$CIRCLE_BRANCH"  || true
-                  git checkout -b "$CIRCLE_BRANCH" || true
-
-                  # Run the releaser now.
-                  GH_TOKEN=$OUTREACH_GITHUB_TOKEN yarn --frozen-lockfile semantic-release --dry-run
-
-                  export CIRCLE_PR_NUMBER=$OLD_CIRCLE_PR_NUMBER
-                  export CIRCLE_PULL_REQUEST=$OLD_CIRCLE_PULL_REQUEST
-                  export CI_PULL_REQUEST=$OLD_CI_PULL_REQUEST
-                  export CIRCLE_BRANCH=$OLD_CIRCLE_BRANCH
+      - shared/setup_environment
+      - shared/with_node_cache:
+          save: true
+      - run:
+          name: Release (Dry-run)
+          command: ./scripts/shell-wrapper.sh ci/release/dryrun.sh
   release:
-    docker:
-      - image: gcr.io/outreach-docker/bootstrap/testbed:1.17.1
-        auth:
-          username: _json_key
-          password: $GCLOUD_SERVICE_ACCOUNT
-    environment:
-      GOPRIVATE: github.com/getoutreach/*
-      GOPROXY: https://proxy.golang.org
+    executor:
+      name: shared/testbed-docker
+      docker_tag: stable
     steps:
-      - with_job_span:
-          steps:
-            - setup_remote_docker:
-                docker_layer_caching: true
-                version: 19.03.13
-            - checkout
-            - add_ssh_keys
-            - run:
-                name: Setup npm Authentication
-                command: echo "//registry.npmjs.org/:_authToken=$NPM_TOKEN" >> ~/.npmrc
-            - run:
-                name: Configuring Golang SSH
-                command: |-
-                  git config --global url."git@github.com:".insteadOf "https://github.com/"
-            - run:
-                name: Setup $CACHE_VERSION Environment Variable
-                command: |-
-                  echo "$CACHE_VERSION" >> cache-version.txt
-            - restore_cache:
-                keys:
-                  - release-node-cache-{{ checksum "cache-version.txt" }}-{{ checksum "package.json" }}
-                  - release-node-cache-{{ checksum "cache-version.txt" }}
-            - run:
-                name: Install semantic-release Dependencies
-                command: buildevents cmd $CIRCLE_WORKFLOW_ID $STEP_SPAN_ID install-sem-release-dependencies -- yarn --frozen-lockfile
-            - save_cache:
-                key: release-node-cache-{{ checksum "cache-version.txt" }}-{{  checksum "package.json" }}
-                paths:
-                  - node_modules
-            - run:
-                name: Release
-                command: |
-                  export GH_TOKEN=$OUTREACH_GITHUB_TOKEN
-                  buildevents cmd $CIRCLE_WORKFLOW_ID $STEP_SPAN_ID semantic-release -- yarn --frozen-lockfile semantic-release
+      - shared/setup_environment
+      - shared/with_node_cache:
+          save: true
+      - run:
+          name: Release
+          command: ./scripts/shell-wrapper.sh ci/release/release.sh
 
   trigger_documentation:
-    docker:
-      - image: gcr.io/outreach-docker/bootstrap/testbed:1.17.1
-        auth:
-          username: _json_key
-          password: $GCLOUD_SERVICE_ACCOUNT
+    executor:
+      name: shared/testbed-docker
+      docker_tag: stable
     steps:
-      - with_job_span:
-          steps:
-            - add_ssh_keys
-            - checkout
-
-            # This is needed to download dependencies, which go list needs for some reason.
-            - restore_cache:
-                keys:
-                  - v2-pkg-cache-{{ checksum "go.sum" }}
-                  - v2-pkg-cache-
-            - run:
-                name: Install Dependencies
-                command: buildevents cmd $CIRCLE_WORKFLOW_ID $STEP_SPAN_ID install-go-dependencies -- make dep
-            - save_cache:
-                key: v2-pkg-cache-{{ checksum "go.sum" }}
-                paths:
-                  - "~/go/pkg"
-
-            - run:
-                name: Trigger Documentation Update
-                command: |-
-                  TAG="$CIRCLE_TAG"
-                  if [[ -z "$TAG" ]]; then
-                    # Calculate the psuedo-semver tag, this is used for non-v2 services
-                    # (things without semantic-release, generally)
-                    TAG="v0.0.0-$(TZ=UTC git --no-pager show --quiet --abbrev=12 --date='format-local:%Y%m%d%H%M%S' --format='%cd-%h')"
-                  fi
-
-                  # We need to use the module path to support major versions properly
-                  MODULE_PATH="$(go list -f '{{ .Path }}' -m)"
-                  URL="https://engdocs.outreach.cloud/fetch/$MODULE_PATH@$TAG"
-
-                  buildevents cmd $CIRCLE_WORKFLOW_ID $STEP_SPAN_ID deploy-docs -- curl -X POST "$URL"
+      - shared/setup_environment
+      - shared/with_go_cache
+      - run:
+          name: Trigger Documentation Update
+          command: ./scripts/shell-wrapper.sh ci/release/docs.sh
 
 workflows:
   version: 2
@@ -269,19 +86,18 @@ workflows:
   ###EndBlock(circleWorkflows)
   build_and_test:
     jobs:
-      - send_traces:
-          context:
-            - docker-registry
-            - buildevents
       ###Block(circleWorkflowJobs)
       ###EndBlock(circleWorkflowJobs)
       - release:
           context:
             - docker-registry
-            - buildevents
             - npm-credentials
+            - ghaccesstoken
+            - package-cloud-credentials
           requires:
             - test
+          ###Block(circleReleaseRequires)
+          ###EndBlock(circleReleaseRequires)
           filters:
             branches:
               only:
@@ -290,8 +106,9 @@ workflows:
       - release-dryrun:
           context:
             - docker-registry
-            - buildevents
             - npm-credentials
+            - ghaccesstoken
+            - package-cloud-credentials
           filters:
             branches:
               ignore:
@@ -299,12 +116,13 @@ workflows:
                 - main
       - test:
           context:
+            - ghaccesstoken
             - docker-registry
-            - buildevents
+            - npm-credentials
       - trigger_documentation:
           context:
+            - ghaccesstoken
             - docker-registry
-            - buildevents
           filters:
             branches:
               ignore: /.*/
