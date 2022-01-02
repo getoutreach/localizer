@@ -1,0 +1,11 @@
+{
+	"Outreach Copyright and Description": {
+		"scope": "go",
+		"prefix": "copyright",
+		"body": [
+			"// Copyright 2022 Outreach Corporation. All Rights Reserved.\n",
+			"// Description: $0"
+		],
+		"description": "Outreach Copyright and Description"
+	}
+}
