@@ -1,0 +1,29 @@
+{
+	"Outreach E2E Test Build Tags": {
+		"scope": "go",
+		"prefix": "build-tag-e2e",
+		"body": [
+			"//go:build or_e2e",
+			"// +build or_e2e\n\n"
+		],
+		"description": "Build tags for end-to-end test files"
+	},
+	"Outreach Unit Test Build Tags": {
+		"scope": "go",
+		"prefix": "build-tag-unit",
+		"body": [
+			"//go:build or_test",
+			"// +build or_test\n\n"
+		],
+		"description": "Build tags for unit test files"
+	},
+	"Outreach Copyright and Description": {
+		"scope": "go",
+		"prefix": "copyright",
+		"body": [
+			"// Copyright ${CURRENT_YEAR} Outreach Corporation. All Rights Reserved.\n",
+			"// Description: $0"
+		],
+		"description": "Outreach Copyright and Description"
+	}
+}

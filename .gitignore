@@ -55,5 +55,9 @@ Pulumi.*.yaml
 # CircleCI cache version
 /cache-version.txt
 
+# DevSpace files
+/.devspace # temp dir
+/deployments/localizer.yaml
+
 ###Block(extras)
 ###EndBlock(extras)
