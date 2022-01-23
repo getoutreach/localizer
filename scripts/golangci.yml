@@ -50,7 +50,6 @@ linters:
   # - gomodguard       # Allow and block list linter for direct Go module dependencies.
   # - goprintffuncname # Checks that printf-like functions are named with `f` at the end.
   # - interfacer       # Linter that suggests narrower interface types.
-  # - lll              # Reports long lines.
   # - maligned         # Tool to detect Go structs that would take less memory if their fields were sorted.
   # - noctx            # Finds sending http request without context.Context.
   # - prealloc         # Finds slice declarations that could potentially be preallocated.
@@ -79,6 +78,7 @@ linters:
     - gosimple
     - govet
     - ineffassign
+    - lll
     # - misspell        # The reason we're disabling this right now is because it uses 1/2 of the memory of the run.
     - nakedret
     - staticcheck
