@@ -4,6 +4,14 @@ updates:
     directory: "/"
     schedule:
       interval: "daily"
+    # Bootstrap managed dependencies
+    ignore:
+      - dependency-name: github.com/getoutreach/mint
+      - dependency-name: github.com/getoutreach/gobox
+      - dependency-name: github.com/getoutreach/httpx
+      - dependency-name: github.com/getoutreach/services
+      - dependency-name: github.com/getoutreach/datastores/v2
+      - dependency-name: github.com/urfave/cli/v2
 
   # Ignore semantic-release, this code is only executed in CI.
   - package-ecosystem: "npm"

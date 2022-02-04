@@ -1,6 +1,21 @@
 name: localizer
-reportingTeam: cia-dev-tooling
+reportingTeam: fnd-dtss
+description: ""
+oss: true
+slack: ""
 library: true
 commands:
   - localizer
-oss: true
+releaseType: ""
+deployTo:
+  environments: []
+arguments:
+  dependencies:
+    optional: []
+    required: []
+  description: ""
+  reportingTeam: fnd-dtss
+  type: []
+modules:
+  - url: https://github.com/getoutreach/stencil-base
+    version: ""
