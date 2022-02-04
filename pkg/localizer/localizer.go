@@ -27,13 +27,15 @@ func IsRunning() bool {
 
 // Connect returns a new instance of LocalizerServiceClient given a gRPC client
 // connection (returned from grpc.Dial*).
-func Connect(ctx context.Context, opts ...grpc.DialOption) (client api.LocalizerServiceClient, closer func(), err error) {
+func Connect(ctx context.Context, opts ...grpc.DialOption) (client api.LocalizerServiceClient,
+	closer func(), err error) {
 	clientConn, err := grpc.DialContext(ctx, fmt.Sprintf("unix://%s", Socket), opts...)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "dial localizer")
 	}
 
 	return api.NewLocalizerServiceClient(clientConn), func() {
-		_ = clientConn.Close() //nolint:errcheck // Why: We can't do anything about an error regarding closing the client connection. We eat the error here so we don't have to nolint on every call.
+		_ = clientConn.Close() //nolint:errcheck // Why: We can't do anything about an error regarding closing the client connection.
+		// We eat the error here so we don't have to nolint on every call.
 	}, nil
 }

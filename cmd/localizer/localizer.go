@@ -26,6 +26,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/bombsimon/logrusr/v2"
 	"github.com/getoutreach/localizer/internal/kevents"
 	"github.com/getoutreach/localizer/internal/kube"
 	"github.com/getoutreach/localizer/internal/server"
@@ -128,7 +129,7 @@ func main() { //nolint:funlen
 				log.SetFormatter(&logrus.JSONFormatter{})
 			}
 
-			klog.SetLogger(&kube.KlogtoLogrus{Log: log.WithField("logger", "klog")})
+			klog.SetLogger(logrusr.New(log))
 
 			// setup the global kubernetes cache interface
 			config, k, err := kube.GetKubeClient(c.String("context"))
