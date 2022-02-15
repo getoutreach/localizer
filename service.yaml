@@ -1,21 +1,37 @@
 name: localizer
 reportingTeam: fnd-dtss
-description: ""
+description: A no-frills local development approach for Kubernetes powered Developer Environments.
 oss: true
 slack: ""
 library: true
 commands:
   - localizer
+circleAPIKey: ""
 releaseType: ""
 deployTo:
   environments: []
 arguments:
+  circleAPIKey: ""
   dependencies:
     optional: []
     required: []
-  description: ""
+  description: A no-frills local development approach for Kubernetes powered Developer Environments.
+  opslevel:
+    confluenceSpaceKey: DTSS
+    designDocumentLink: ""
+  oss: true
   reportingTeam: fnd-dtss
-  type: []
+  type:
+    - library
 modules:
   - url: https://github.com/getoutreach/stencil-base
     version: ""
+opsLevel:
+  serviceTier: 0
+  lifecycle: ""
+  confluenceSpaceKey: DTSS
+  pagerDutyLink: ""
+  datadogDashboards:
+    mainLink: ""
+    custom: []
+  designDocumentLink: ""

@@ -1,9 +1,17 @@
+
 # localizer
+[![go.dev reference](https://img.shields.io/badge/go.dev-reference-007d9c?logo=go&logoColor=white)](https://pkg.go.dev/github.com/getoutreach/localizer)
+[![Generated via Bootstrap](https://img.shields.io/badge/Outreach-Bootstrap-%235951ff)](https://github.com/getoutreach/bootstrap)
 
 A no-frills local development approach for Kubernetes powered Developer Environments.
 
-## Why another CLI tool?
+## Contributing
 
+Please read the [CONTRIBUTING.md](CONTRIBUTING.md) document for guidelines on developing and contributing changes.
+
+## High-level Overview
+
+<!--- Block(overview) -->
 Tools such as; Telepresence, Skaffold, and others all attempt to solve the problem of getting users
 used to using Kubernetes. This is a pretty big task given that Kubernetes has a gigantic surface
 area. From my experience (**keyword**: _my experience_), developers have no interest in what
@@ -67,3 +75,5 @@ Outside of WSL? Not currently. PRs are welcome!
 ## License
 
 Apache-2.0
+
+<!--- EndBlock(overview) -->
