@@ -12,7 +12,9 @@
 
 
 <!--- Block(jiraPrefix) --->
-**JIRA ID**: XX-XX
+## Jira ID
+
+[XX-XX]
 <!--- EndBlock(jiraPrefix) --->
 
 <!-- Notes that may be helpful for anyone reviewing this PR -->

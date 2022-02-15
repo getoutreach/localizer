@@ -1,48 +1,36 @@
+
 # localizer
 
-<!--- Block(custom) -->
-<!--
-We expect CONTRIBUTING.md to look mostly identical for all bootstrap services.
+<!--- Block(customGeneralInformation) -->
+<!--- EndBlock(customGeneralInformation) -->
 
-If your service requires special instructions for developers, you can place
-those instructions in this block. If your service isn't special, it's safe to
-leave this comment here as-is.
+## Prerequisites
 
-If the text you are about to add here applies to many or all bootstrap services,
-consider adding it to the bootstrap template instead.
--->
-<!--- EndBlock(custom) -->
-
-The following sections of CONTRIBUTING.md were generated with
-[bootstrap](https://github.com/getoutreach/bootstrap) and are common to all
-bootstrap services.
-
-## Dependencies
-
-Make sure you've followed the [Launch Plan](https://outreach-io.atlassian.net/wiki/spaces/EN/pages/695698940/Launch+Plan).
-[Set up bootstrap](https://outreach-io.atlassian.net/wiki/spaces/EN/pages/701596137/Services+Checklist) if you're planning on updating bootstrap files.
-
-<!--- Block(devDependencies) -->
-<!--- EndBlock(devDependencies) -->
+<!-- Block(customPrerequisites) -->
+<!-- EndBlock(customPrerequisites) -->
 
 ## Building and Testing
 
-<!--- Block(buildCustom) -->
-<!--- EndBlock(buildCustom) -->
+<!-- Block(customBuildingAndTesting) -->
+<!-- EndBlock(customBuildingAndTesting) -->
+### Replacing a Remote Version of the Library with Local Version
 
-### Building (Locally)
+If you want to test the library exposed in this repository in a project that uses it, you can
+add the following `replace` directive to that project's `go.mod` file:
 
-To produce binaries in the `./bin/` folder, run `make build`.
+```
+replace github.com/getoutreach/localizer => /path/to/local/version/localizer
+```
 
-### Unit Testing
+**_Note_**: This library may have postfixed it's module path with a version, go check the first
+line of the `go.mod` file in this repository to see if that is the case. If that is the case,
+you will need to modify the first part of the replace directive (the part before the `=>`) with
+that postfixed path.
 
-You can run the tests with:
+### Linting and Unit Testing
+
+You can run the the linters and unit tests with:
 
 ```bash
 make test
 ```
-
-
-## Releasing
-
-Making releases for this repository follows the process in the [Bootstrap](https://github.com/getoutreach/bootstrap/tree/master/README.md#semver) documentation.
