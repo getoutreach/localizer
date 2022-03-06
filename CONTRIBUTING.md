@@ -1,4 +1,3 @@
-
 # localizer
 
 <!--- Block(customGeneralInformation) -->
@@ -6,13 +5,14 @@
 
 ## Prerequisites
 
-<!-- Block(customPrerequisites) -->
-<!-- EndBlock(customPrerequisites) -->
+<!--- Block(customPrerequisites) -->
+<!--- EndBlock(customPrerequisites) -->
 
 ## Building and Testing
 
-<!-- Block(customBuildingAndTesting) -->
-<!-- EndBlock(customBuildingAndTesting) -->
+<!--- Block(customBuildingAndTesting) -->
+<!--- EndBlock(customBuildingAndTesting) -->
+
 ### Replacing a Remote Version of the Library with Local Version
 
 If you want to test the library exposed in this repository in a project that uses it, you can
