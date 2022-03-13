@@ -1,5 +1,5 @@
-
 # localizer
+
 [![go.dev reference](https://img.shields.io/badge/go.dev-reference-007d9c?logo=go&logoColor=white)](https://pkg.go.dev/github.com/getoutreach/localizer)
 [![Generated via Bootstrap](https://img.shields.io/badge/Outreach-Bootstrap-%235951ff)](https://github.com/getoutreach/bootstrap)
 
@@ -12,6 +12,7 @@ Please read the [CONTRIBUTING.md](CONTRIBUTING.md) document for guidelines on de
 ## High-level Overview
 
 <!--- Block(overview) -->
+
 Tools such as; Telepresence, Skaffold, and others all attempt to solve the problem of getting users
 used to using Kubernetes. This is a pretty big task given that Kubernetes has a gigantic surface
 area. From my experience (**keyword**: _my experience_), developers have no interest in what
@@ -21,10 +22,10 @@ a tool that requires no configuration, and is self-explanatory. Which these tool
 
 Given the above, localizer attempts to solve this problem with a few rules:
 
-* A kubernetes cluster should be able to be run locally, but applications should be accessible as if
-they were running "locally" (**Note**: Only on Linux do containers _actually_ run locally, the rest are VMs pretending)
-* There should be little-to-no DSL to interact with services running in Kubernetes locally.
-* No assurances of code working locally will just "work" in Kubernetes. (Let's face it, what you're running locally will never match your production clusters 100%, and if we need to test Kubernetes manifests/etc we should be deploying things into our local cluster and be used to debugging whatever way you do that).
+- A kubernetes cluster should be able to be run locally, but applications should be accessible as if
+  they were running "locally" (**Note**: Only on Linux do containers _actually_ run locally, the rest are VMs pretending)
+- There should be little-to-no DSL to interact with services running in Kubernetes locally.
+- No assurances of code working locally will just "work" in Kubernetes. (Let's face it, what you're running locally will never match your production clusters 100%, and if we need to test Kubernetes manifests/etc we should be deploying things into our local cluster and be used to debugging whatever way you do that).
 
 ## What does `localizer` actually do?
 
@@ -49,6 +50,7 @@ allowing remote resources to access your local machine as if they were also runn
 ## Install `localizer`
 
 You can install the (OSX/LINUX) binary directly into /usr/local/bin:
+
 ```
 $ curl -Ls https://github.com/getoutreach/localizer/releases/download/v1.9.0/localizer_1.9.0_$(uname)_amd64.tar.gz | tar -xzC /usr/local/bin localizer
 ```

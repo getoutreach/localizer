@@ -18,7 +18,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/bombsimon/logrusr/v2"
 	oapp "github.com/getoutreach/gobox/pkg/app"
 	gcli "github.com/getoutreach/gobox/pkg/cli"
 	"github.com/getoutreach/localizer/internal/kevents"
