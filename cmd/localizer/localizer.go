@@ -9,14 +9,11 @@ package main
 import (
 	"context"
 	"fmt"
-	"io"
 	"os"
 	"os/signal"
 	"os/user"
-	"path/filepath"
 	"strings"
 	"syscall"
-	"time"
 
 	"github.com/bombsimon/logrusr/v2"
 	oapp "github.com/getoutreach/gobox/pkg/app"
@@ -122,19 +119,6 @@ func main() {
 			log.WithField("signal", sig.String()).Info("shutting down")
 			cancel()
 		}()
-
-		// best attempt don't output on --help or --version
-		if c.Args().First() != "--version" || c.Args().First() != "--help" {
-			// write to a logfile
-			tmpFilePath := filepath.Join(os.TempDir(), "localizer-"+strings.ReplaceAll(time.Now().Format(time.RFC3339), ":", "-")+".log")
-			tmpFile, err := os.Create(tmpFilePath)
-			if err == nil {
-				defer tmpFile.Close()
-
-				log.Out = io.MultiWriter(os.Stderr, tmpFile)
-			}
-			log.WithField("file.path", tmpFilePath).Info("created logfile")
-		}
 
 		if strings.EqualFold(c.String("log-level"), "debug") {
 			log.SetLevel(logrus.DebugLevel)
