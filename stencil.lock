@@ -1,0 +1,58 @@
+version: v1.5.0
+generated: 2022-03-27T00:04:36.405230488Z
+modules:
+    - name: github.com/getoutreach/stencil-base
+      url: https://github.com/getoutreach/stencil-base
+      version: v0.0.5
+files:
+    - name: .github/CODEOWNERS
+      template: .github/CODEOWNERS.tpl
+      module: github.com/getoutreach/stencil-base
+    - name: .github/pull_request_template.md
+      template: .github/pull_request_template.md.tpl
+      module: github.com/getoutreach/stencil-base
+    - name: .gitignore
+      template: .gitignore.tpl
+      module: github.com/getoutreach/stencil-base
+    - name: .releaserc.yaml
+      template: .releaserc.yaml.tpl
+      module: github.com/getoutreach/stencil-base
+    - name: CONTRIBUTING.md
+      template: CONTRIBUTING.md.tpl
+      module: github.com/getoutreach/stencil-base
+    - name: LICENSE
+      template: LICENSE.tpl
+      module: github.com/getoutreach/stencil-base
+    - name: README.md
+      template: README.md.tpl
+      module: github.com/getoutreach/stencil-base
+    - name: documentation/README.md
+      template: documentation/README.md.tpl
+      module: github.com/getoutreach/stencil-base
+    - name: documentation/SLOs.md
+      template: documentation/SLOs.md.tpl
+      module: github.com/getoutreach/stencil-base
+    - name: documentation/disaster-recovery.md
+      template: documentation/disaster-recovery.md.tpl
+      module: github.com/getoutreach/stencil-base
+    - name: documentation/rollout-plan.md
+      template: documentation/rollout-plan.md.tpl
+      module: github.com/getoutreach/stencil-base
+    - name: documentation/runbook.md
+      template: documentation/runbook.md.tpl
+      module: github.com/getoutreach/stencil-base
+    - name: helpers
+      template: helpers.tpl
+      module: github.com/getoutreach/stencil-base
+    - name: package.json
+      template: package.json.tpl
+      module: github.com/getoutreach/stencil-base
+    - name: scripts/bootstrap-lib.sh
+      template: scripts/bootstrap-lib.sh.tpl
+      module: github.com/getoutreach/stencil-base
+    - name: scripts/devbase.sh
+      template: scripts/devbase.sh.tpl
+      module: github.com/getoutreach/stencil-base
+    - name: scripts/shell-wrapper.sh
+      template: scripts/shell-wrapper.sh.tpl
+      module: github.com/getoutreach/stencil-base

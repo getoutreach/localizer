@@ -1,6 +1,6 @@
 version: 2.1
 orbs:
-  shared: getoutreach/shared@1.49.6
+  shared: getoutreach/shared@1.53.1
 
 # DEPRECATED: Use the devbase orb instead:
 # https://github.com/getoutreach/devbase/tree/main/orbs/shared
@@ -29,6 +29,8 @@ jobs:
         auth:
           username: _json_key
           password: $GCLOUD_SERVICE_ACCOUNT
+    ###Block(customContainers)
+    ###EndBlock(customContainers)
     environment:
       ###Block(testEnvVars)
       ###EndBlock(testEnvVars)
@@ -52,6 +54,8 @@ jobs:
     executor:
       name: shared/testbed-docker
       docker_tag: stable
+    ###Block(releaseDryRun)
+    ###EndBlock(releaseDryRun)
     steps:
       - shared/setup_environment
       - shared/with_node_cache:
@@ -63,6 +67,8 @@ jobs:
     executor:
       name: shared/testbed-docker
       docker_tag: stable
+    ###Block(release)
+    ###EndBlock(release)
     steps:
       - shared/setup_environment
       - shared/with_node_cache:
@@ -133,3 +139,9 @@ workflows:
               ignore: /.*/
             tags:
               only: /v[0-9]+(\.[0-9]+)*(-.*)*/
+      - finalize-coverage:
+          context:
+            - docker-registry
+            - ghaccesstoken
+          requires:
+            - test
