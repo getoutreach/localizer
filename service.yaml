@@ -12,19 +12,27 @@ deployTo:
   environments: []
 arguments:
   circleAPIKey: ""
+  commands:
+    - localizer
   dependencies:
     optional: []
     required: []
   description: A no-frills local development approach for Kubernetes powered Developer Environments.
+  grpcClients: []
   opslevel:
     confluenceSpaceKey: DTSS
+    datadogDashboards:
+      mainLink: ""
     designDocumentLink: ""
   oss: true
+  releaseOptions:
+    allowMajorVersions: null
+    allowPrereleases: false
   reportingTeam: fnd-dtss
   type:
     - library
 modules:
-  - url: https://github.com/getoutreach/stencil-base
+  - name: github.com/getoutreach/stencil-base
     version: ""
 opsLevel:
   serviceTier: 0

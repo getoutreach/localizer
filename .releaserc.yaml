@@ -11,8 +11,7 @@ plugins:
           release: patch
   # Block major version upgrades due to us not supporting them that well. This can
   # be disabled by setting releaseOptions.allowMajorVersions, but be warned this
-  # is not well supported for services. Please talk to #dev-tooling-support before
-  # doing this to save yourself from issues.
+  # is not well supported for services.
   - - "@semantic-release/exec"
     # We use generateNotesCmd instead of verifyConditionsCmd because it has access
     # to last/nextRelease due to when the step runs.

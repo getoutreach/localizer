@@ -1,6 +1,6 @@
 APP := localizer
 OSS := true
-_ := $(shell ./scripts/bootstrap-lib.sh) 
+_ := $(shell ./scripts/devbase.sh) 
 
 include .bootstrap/root/Makefile
 

@@ -1,0 +1,18 @@
+.git/
+
+# Unnecessary files (for a docker image)
+.github/
+.vscode/
+deployments/
+monitoring/
+
+# Node modules
+
+node_modules/
+
+# Temorary files
+.devspace/
+bin/
+
+###Block(extras)
+###EndBlock(extras)

@@ -29,5 +29,8 @@
   },
   "gopls": {
     "build.buildFlags": ["-tags=or_test,or_dev,or_e2e,or_int"]
+  },
+  "[terraform]": {
+    "editor.defaultFormatter": "hashicorp.terraform"
   }
 }
