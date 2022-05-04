@@ -1,11 +1,9 @@
-golang 1.17.5
-terraform 0.13.5
-protoc 3.19.1
-ruby 2.6.6
-# Note: This version of node is just for bootstrap tooling
-# not for actual usage of node clients (if they exist) for
-# this service.
+# This file contains tool versions for use with asdf
+golang 1.17.9
 nodejs 16.13.0
+terraform 0.13.5
+ruby 2.6.6
+protoc 3.19.1
 # Note: Versions in this block override the above. Be EXTREMELY
 # CAREFUL with this. If you override a standard version you are
 # reducing compatibility guarantees.

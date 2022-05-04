@@ -2,8 +2,8 @@
 
 Localizer was made to address the gap between local machines and their local Kubernetes clusters. Due to multi-platform Kubernetes clusters usually running inside of a VM, there are network boundaries, among other things, between the developer and their cluster. Localizer solves this problem by being a cross between a VPN and an SSH reverse proxy. This breaks localizer into two distinct areas:
 
- * VPN-like implementation (proxier/tunnel)
- * SSH Reverse Proxy (expose)
+- VPN-like implementation (proxier/tunnel)
+- SSH Reverse Proxy (expose)
 
 These two areas are held together and controlled by a GRPC server to allow Localizer to run as a daemon. Subsequent calls to localizer work as a client to that daemon.
 
@@ -11,12 +11,12 @@ These two areas are held together and controlled by a GRPC server to allow Local
 
 Among the two features of Localizer, tunnel and expose, there are a bunch of different packages that make up Localizer:
 
- * `expose` - Handles creating an SSH-powered reverse proxy from the k8s cluster to the local machine
- * `kube` - Kubernetes client and other functions
- * `kevents` - Kubernetes global cache
- * `proxier` - Kubernetes port-forward manager, the VPN-like implementation 
- * `server` - GRPC server implementation for the daemon
- * `ssh` - Implementation of an SSH client + reverse proxy
+- `expose` - Handles creating an SSH-powered reverse proxy from the k8s cluster to the local machine
+- `kube` - Kubernetes client and other functions
+- `kevents` - Kubernetes global cache
+- `proxier` - Kubernetes port-forward manager, the VPN-like implementation
+- `server` - GRPC server implementation for the daemon
+- `ssh` - Implementation of an SSH client + reverse proxy
 
 Outside of these packages, there is the CLI layer that "glues" all of this together.
 
