@@ -16,7 +16,7 @@ package hostsfile
 import (
 	"bytes"
 	"context"
-	"io/ioutil"
+	"os"
 	"reflect"
 	"testing"
 
@@ -181,7 +181,7 @@ func TestFile_HandleCorruption(t *testing.T) {
 		t.Error(errors.Wrap(err, "failed to marshal hosts file"))
 	}
 
-	origContents, err := ioutil.ReadFile("./testdata/load/hosts-with-block-corrupt.hosts")
+	origContents, err := os.ReadFile("./testdata/load/hosts-with-block-corrupt.hosts")
 	if err != nil {
 		t.Fatal(err)
 	}

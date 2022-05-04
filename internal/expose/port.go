@@ -301,13 +301,13 @@ func (p *ServiceForward) Start(ctx context.Context) error { //nolint:funlen
 			case <-ctx.Done():
 				return
 			default:
-				if lastErr == ErrNotInitialized {
+				if errors.Is(lastErr, ErrNotInitialized) {
 					p.log.Debug("creating tunnel connection")
 				} else {
 					p.log.WithError(lastErr).Errorf("connection died, recreating tunnel connection")
 				}
 
-				if lastErr != ErrNotInitialized {
+				if !errors.Is(lastErr, ErrNotInitialized) {
 					// we can't really do exponential backoff right now, so do a set time
 					select {
 					case <-ctx.Done():

@@ -5,16 +5,13 @@ root = true
 end_of_line = lf
 insert_final_newline = true
 
-[Makefile]
+[*.go,Makefile]
 indent_style = tab
-
-[*.go]
-indent_style = tab
-indent_size  = 2
 
 [*.{bash,rb,sh,slim,yml,yaml}]
 indent_style = space
 indent_size  = 2
 
 ###Block(editorconfig)
+
 ###EndBlock(editorconfig)

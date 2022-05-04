@@ -16,7 +16,7 @@ package proxier
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net"
 	"net/http"
 	"os"
@@ -303,7 +303,7 @@ func (w *worker) CreatePortForward(ctx context.Context, req *CreatePortForwardRe
 			Name(pod.Name).
 			SubResource("portforward").URL())
 
-		fw, err := portforward.NewOnAddresses(dialer, []string{ipAddress.IP.String()}, req.Ports, ctx.Done(), nil, ioutil.Discard, ioutil.Discard)
+		fw, err := portforward.NewOnAddresses(dialer, []string{ipAddress.IP.String()}, req.Ports, ctx.Done(), nil, io.Discard, io.Discard)
 		if err != nil {
 			return errors.Wrap(err, "failed to create port-forward")
 		}
@@ -326,7 +326,7 @@ func (w *worker) CreatePortForward(ctx context.Context, req *CreatePortForwardRe
 					Hostnames:      req.Hostnames,
 					Ports:          req.Ports,
 					Recreate:       true,
-					RecreateReason: fmt.Sprintf("%v", err),
+					RecreateReason: err.Error(),
 				},
 			}
 		}()
@@ -371,7 +371,8 @@ func (w *worker) stopPortForward(_ context.Context, conn *PortForwardConnection)
 			args := []string{"lo0", "-alias", ipStr}
 			if err := exec.Command("ifconfig", args...).Run(); err != nil {
 				message := ""
-				if exitError, ok := err.(*exec.ExitError); ok {
+				var exitError exec.ExitError
+				if ok := errors.As(err, &exitError); ok {
 					message = string(exitError.Stderr)
 				}
 				errs = append(errs, errors.Wrapf(err, "failed to release ip alias: %s", message))

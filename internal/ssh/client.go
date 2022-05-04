@@ -169,7 +169,7 @@ func (c *Client) Start(ctx context.Context, serviceKey string) error { //nolint:
 				}
 				client, err := listener.Accept()
 				if err != nil {
-					if err != io.EOF {
+					if !errors.Is(err, io.EOF) {
 						c.log.WithError(err).Errorf("failed to accept traffic on remote listener")
 					}
 					return
