@@ -20,7 +20,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net"
 	"os"
 	"sort"
@@ -313,7 +312,7 @@ func (f *File) Save(ctx context.Context) error {
 	var err error
 	if f.fileLocation != "" {
 		f.lock.Lock()
-		contents, err := ioutil.ReadFile(f.fileLocation)
+		contents, err := os.ReadFile(f.fileLocation)
 		if err != nil {
 			return err
 		}
@@ -326,7 +325,7 @@ func (f *File) Save(ctx context.Context) error {
 		return errors.Wrap(err, "failed to marshal hostsfile")
 	}
 
-	return ioutil.WriteFile(f.fileLocation, b, f.fileInfo.Mode())
+	return os.WriteFile(f.fileLocation, b, f.fileInfo.Mode())
 }
 
 // AddHosts adds a line into the hosts file for the given hosts to resolve

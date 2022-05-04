@@ -16,7 +16,7 @@ package kube
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 
 	"github.com/getoutreach/localizer/internal/kevents"
@@ -79,7 +79,7 @@ func CreatePortForward(ctx context.Context, r rest.Interface, rc *rest.Config,
 	}
 	dialer := spdy.NewDialer(upgrader, &http.Client{Transport: transport}, "POST", req.URL())
 
-	return portforward.NewOnAddresses(dialer, []string{ip}, ports, ctx.Done(), nil, ioutil.Discard, ioutil.Discard)
+	return portforward.NewOnAddresses(dialer, []string{ip}, ports, ctx.Done(), nil, io.Discard, io.Discard)
 }
 
 type ResolvedServicePort struct {

@@ -89,7 +89,7 @@ func NewExposeCommand(log logrus.FieldLogger) *cli.Command { //nolint:funlen
 
 			for {
 				res, err := stream.Recv()
-				if err == io.EOF {
+				if errors.Is(err, io.EOF) {
 					return nil
 				} else if err != nil {
 					return err

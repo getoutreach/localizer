@@ -87,7 +87,7 @@ func (g *GRPCService) Run(ctx context.Context, log logrus.FieldLogger) error { /
 	}
 	defer os.Remove(localizer.Socket)
 
-	err = os.Chmod(localizer.Socket, 0777)
+	err = os.Chmod(localizer.Socket, 0o777)
 	if err != nil {
 		return err
 	}

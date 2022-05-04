@@ -24,8 +24,10 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
 	"k8s.io/klog/v2"
+
 	// Place any extra imports for your startup code here
 	///Block(imports)
+	logrusr "github.com/bombsimon/logrusr/v2"
 	///EndBlock(imports)
 )
 
