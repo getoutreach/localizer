@@ -12,9 +12,9 @@ service:
   owner: fnd_dtss
   language: Golang
   framework: stencil
-  description: A no-frills local development approach for Kubernetes powered Developer Environments.
+  description: >
+    A no-frills local development approach for Kubernetes powered Developer Environments.
   ###Block(extraServiceMetadata)
-
   ###EndBlock(extraServiceMetadata)
   aliases:
     ###Block(extraAliases)
@@ -34,7 +34,7 @@ service:
     - key: name
       value: "localizer"
     - key: stencil_version
-      value: "v1.14.1"
+      value: "v1.15.0"
     - key: golang_version
       value: "1.17.9"
     - key: tutorial

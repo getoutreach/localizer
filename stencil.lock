@@ -1,15 +1,15 @@
-version: v1.14.1
-generated: 2022-05-04T19:22:29.761103Z
+version: v1.15.0
+generated: 2022-05-17T22:26:44.628547Z
 modules:
 - name: github.com/getoutreach/stencil-base
   url: https://github.com/getoutreach/stencil-base
-  version: v0.3.0-rc.2
+  version: v0.3.0
 - name: github.com/getoutreach/stencil-golang
   url: https://github.com/getoutreach/stencil-golang
-  version: v0.3.0-rc.4
+  version: v0.3.2
 - name: github.com/getoutreach/stencil-opslevel
   url: https://github.com/getoutreach/stencil-opslevel
-  version: v0.0.2-rc.5
+  version: v0.0.2
 - name: github.com/getoutreach/stencil-discovery
   url: https://github.com/getoutreach/stencil-discovery
   version: v1.0.0

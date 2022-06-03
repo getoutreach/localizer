@@ -42,11 +42,8 @@ arguments:
     - deploy/flagship-shared-secret/%(environment)s/authn-flagship-payload
 modules:
   - name: github.com/getoutreach/stencil-base
-    version: v0.3.0-rc.2
   - name: github.com/getoutreach/stencil-golang
-    version: v0.3.0-rc.4
   - name: github.com/getoutreach/stencil-opslevel
-    version: v0.0.2-rc.5
 opsLevel:
   serviceTier: 0
   lifecycle: ""
