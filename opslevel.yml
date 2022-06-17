@@ -34,7 +34,7 @@ service:
     - key: name
       value: "localizer"
     - key: stencil_version
-      value: "v1.15.0"
+      value: "v1.19.3"
     - key: golang_version
       value: "1.17.9"
     - key: tutorial

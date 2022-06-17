@@ -13,8 +13,34 @@
       "go.testEnvFile": "${workspaceRoot}/.vscode/private.env",
       "program": "${workspaceRoot}/cmd/localizer/",
       "buildFlags": "-tags=or_dev"
+    },
+    {
+      "name": "Attach to dev container",
+      "type": "go",
+      "debugAdapter": "dlv-dap",
+      "request": "attach",
+      "mode": "remote",
+      ///Block(vscodeRemoteDebug)
+      "host": "127.0.0.1",
+      "port": 42097,
+      ///EndBlock(vscodeRemoteDebug)
+      "substitutePath": [
+        {
+          "from": "${workspaceRoot}",
+          "to": "/home/dev/app"
+        },
+        {
+          "from": "${env:HOME}/.asdf/installs/golang/1.17.9/packages/pkg/mod",
+          "to": "/tmp/cache/go/mod/"
+        },
+        {
+          "from": "${env:HOME}/.asdf/installs/golang/1.17.9/go/src",
+          "to": "/home/dev/.asdf/installs/golang/1.17.9/go/src"
+        }
+      ]
     }
     ///Block(vscodeLaunchConfigs)
+
     ///EndBlock(vscodeLaunchConfigs)
   ]
 }

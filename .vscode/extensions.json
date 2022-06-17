@@ -1,6 +1,7 @@
 {
   "recommendations": [
     "editorconfig.editorconfig",
+    "hashicorp.terraform",
     "golang.go",
     "heptio.jsonnet",
     "xrc-inc.jsonnet-formatter",
@@ -13,6 +14,7 @@
     // Please consider contributing back all recommended
     // extensions to bootstrap!
     ///Block(extensions)
+
     ///EndBlock(extensions)
   ]
 }
