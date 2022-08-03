@@ -9,7 +9,7 @@ version: 1
 service:
   name: localizer
   product: Outreach
-  owner: fnd_dtss
+  owner: fnd_dt
   language: Golang
   framework: stencil
   description: >
@@ -28,13 +28,13 @@ service:
     - key: repo
       value: "https://github.com/getoutreach/localizer"
     - key: reporting_team
-      value: "fnd-dtss"
+      value: "fnd-dt"
     - key: app
       value: "localizer"
     - key: name
       value: "localizer"
     - key: stencil_version
-      value: "v1.15.0"
+      value: "v1.21.1"
     - key: golang_version
       value: "1.17.9"
     - key: tutorial

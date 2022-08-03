@@ -29,3 +29,7 @@ plugins:
     - assets:
         - "dist/*.tar.gz"
         - "dist/checksums.txt"
+
+  ### Block(customReleasePlugins)
+
+  ### EndBlock(customReleasePlugins)

@@ -15,6 +15,7 @@
 syntax = "proto3";
 
 package api.v1;
+
 option go_package = "github.com/getoutreach/localizer/api";
 
 message ExposeServiceRequest {
@@ -61,11 +62,15 @@ message ListService {
   repeated string ports = 7;
 }
 
-message ListResponse { repeated ListService services = 1; }
+message ListResponse {
+  repeated ListService services = 1;
+}
 
 message Empty {}
 
-message StableResponse { bool stable = 1; }
+message StableResponse {
+  bool stable = 1;
+}
 
 service LocalizerService {
   rpc ExposeService(ExposeServiceRequest) returns (stream ConsoleResponse) {}

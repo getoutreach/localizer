@@ -1,187 +1,105 @@
+# Please re-run stencil after any changes to this file as invalid
+# syntax, such as anchors, will be fixed automatically.
 version: 2.1
 orbs:
-  shared: getoutreach/shared@1.64.3
+  shared: getoutreach/shared@2.2.0
 
-# DEPRECATED: Use the devbase orb instead:
-# https://github.com/getoutreach/devbase/tree/main/orbs/shared
-commands:
-  with_job_span:
-    parameters:
-      steps:
-        type: steps
-    steps:
-      - run:
-          name: DEPRECATION NOTICE
-          command: echo "with_job_span is deprecated and should be removed"
-      - steps: << parameters.steps >>
+# Extra contexts to expose to all jobs below
+contexts: &contexts
+  - aws-credentials
+  - ghaccesstoken
+  - docker-registry
+  - npm-credentials
+  - prismacloud-credentials
+  - opslevel-credentials
+  - vault-dev
+  - confluence
+  ###Block(extraContexts)
+
+  ###EndBlock(extraContexts)
 
 jobs:
+  {}
   ###Block(circleJobs)
+
   ###EndBlock(circleJobs)
 
-  test:
-    executor:
-      name: shared/testbed-docker
-    ###Block(circleTestOverride)
-    ###EndBlock(circleTestOverride)
-    docker:
-      - image: gcr.io/outreach-docker/bootstrap/ci:stable
-        auth:
-          username: _json_key
-          password: $GCLOUD_SERVICE_ACCOUNT
-    ###Block(customContainers)
-    ###EndBlock(customContainers)
-    environment:
-      ###Block(testEnvVars)
-      ###EndBlock(testEnvVars)
-    steps:
-      - shared/setup_environment
-      - run:
-          name: Wait for Infrastructure to be Ready
-          command: ./scripts/shell-wrapper.sh ci/testing/wait-for-infra.sh
-      - shared/with_go_cache
-      - run:
-          name: Run unit tests
-          # Store the results of our tests in the $TEST_RESULTS directory
-          command: make test | tee ${TEST_RESULTS}/go-test.out
-      - run:
-          name: Upload Code Coverage
-          command: ./scripts/shell-wrapper.sh ci/testing/coveralls.sh test
-      - shared/save_go_cache # We save at the end because binaries are included with this
-      - shared/upload_test_results # Uploads to CircleCI
-
-  finalize-coverage:
-    executor:
-      name: shared/testbed-docker
-    docker:
-      - image: gcr.io/outreach-docker/bootstrap/ci:stable
-        auth:
-          username: _json_key
-          password: $GCLOUD_SERVICE_ACCOUNT
-    steps:
-      - shared/setup_environment
-      - run:
-          name: Finish Coveralls upload
-          command: ./scripts/shell-wrapper.sh ci/testing/coveralls-finish.sh
-
-  e2e:
-    executor:
-      name: shared/testbed-machine
-    environment:
-      VAULT_ADDR: https://vault-dev.outreach.cloud
-    resource_class: large
-    steps:
-      - shared/setup_environment:
-          machine: true
-      - shared/with_go_cache
-      - run:
-          name: Run E2E Tests
-          command: KUBECONFIG="$HOME/.outreach/kubeconfig.yaml" make e2e | tee ${TEST_RESULTS}/go-test.out
-      - run:
-          name: Upload Code Coverage
-          command: ./scripts/shell-wrapper.sh ci/testing/coveralls.sh e2e
-      - shared/save_go_cache # We save at the end because binaries are included with this
-      - shared/upload_test_results # Uploads to CircleCI
-
-  release-dryrun:
-    executor:
-      name: shared/testbed-docker
-      docker_tag: stable
-    ###Block(releaseDryRun)
-    ###EndBlock(releaseDryRun)
-    steps:
-      - shared/setup_environment
-      - shared/with_node_cache:
-          save: true
-      - run:
-          name: Release (Dry-run)
-          command: ./scripts/shell-wrapper.sh ci/release/dryrun.sh
-  release:
-    executor:
-      name: shared/testbed-docker
-      docker_tag: stable
-    ###Block(release)
-    ###EndBlock(release)
-    steps:
-      - shared/setup_environment
-      - shared/with_node_cache:
-          save: true
-      - run:
-          name: Release
-          command: ./scripts/shell-wrapper.sh ci/release/release.sh
-
-  publish_docs:
-    executor:
-      name: shared/testbed-docker
-      docker_tag: stable
-    steps:
-      - shared/setup_environment
-      - shared/with_go_cache
-      - run:
-          name: Publish Documentation
-          command: ./scripts/shell-wrapper.sh ci/release/docs.sh
+  ### Start jobs inserted by other modules
+  ### End jobs inserted by other modules
 
 workflows:
   version: 2
   ###Block(circleWorkflows)
+
   ###EndBlock(circleWorkflows)
-  build_and_test:
+
+  ### Start workflows inserted by other modules
+  ### End workflows inserted by other modules
+
+  release:
     jobs:
       ###Block(circleWorkflowJobs)
+
       ###EndBlock(circleWorkflowJobs)
-      - release:
-          context:
-            - docker-registry
-            - npm-credentials
-            - ghaccesstoken
-            - package-cloud-credentials
+      ### Start jobs inserted by other modules
+      ### End jobs inserted by other modules
+      - shared/release: &release
+          dryrun: false
+          context: *contexts
+          ###Block(circleReleaseExtra)
+
+          ###EndBlock(circleReleaseExtra)
           requires:
-            - test
-          ###Block(circleReleaseRequires)
-          ###EndBlock(circleReleaseRequires)
+            ###Block(circleReleaseRequires)
+
+            ###EndBlock(circleReleaseRequires)
+            - shared/test
           filters:
             branches:
               only:
                 - master
                 - main
-      - release-dryrun:
-          context:
-            - docker-registry
-            - npm-credentials
-            - ghaccesstoken
-            - package-cloud-credentials
+      # Dryrun release for PRs
+      - shared/release:
+          <<: *release
+          dryrun: true
           filters:
             branches:
               ignore:
                 - master
                 - main
-      - test:
-          context:
-            - ghaccesstoken
-            - docker-registry
-            - npm-credentials
-            ###Block(circleTestContext)
-            ###EndBlock(circleTestContext)
-      - publish_docs:
-          context:
-            - ghaccesstoken
-            - docker-registry
-            - confluence
+      - shared/test:
+          context: *contexts
+          app_name: localizer
+          ### Start parameters inserted by other modules
+          ### End parameters inserted by other modules
+          ###Block(circleTestExtra)
+
+          ###EndBlock(circleTestExtra)
+
+      - shared/publish_docs:
+          context: *contexts
           filters:
             branches:
               ignore: /.*/
             tags:
               only: /v[0-9]+(\.[0-9]+)*(-.*)*/
-      - e2e:
-          context:
-            - docker-registry
-            - ghaccesstoken
-            - vault-dev
-            - aws-credentials
-      - finalize-coverage:
-          context:
-            - docker-registry
-            - ghaccesstoken
+      - shared/finalize-coverage:
+          context: *contexts
           requires:
-            - e2e
-            - test
+            - shared/e2e
+            - shared/test
+      - shared/e2e:
+          context: *contexts
+          ###Block(circleE2EExtra)
+
+          ###EndBlock(circleE2EExtra)
+      - shared/docker:
+          context: *contexts
+          filters:
+            branches:
+              ignore:
+                - master
+                - main
+            tags:
+              only: /v\d+(\.\d+)*(-.*)*/
