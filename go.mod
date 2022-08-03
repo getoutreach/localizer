@@ -13,7 +13,7 @@ require (
 	github.com/metal-stack/go-ipam v1.8.5
 	github.com/pkg/errors v0.9.1
 	github.com/sirupsen/logrus v1.8.1
-	github.com/urfave/cli/v2 v2.4.0
+	github.com/urfave/cli/v2 v2.6.0
 	golang.org/x/crypto v0.0.0-20220408190544-5352b0902921
 	google.golang.org/genproto v0.0.0-20210831024726-fe130286e0e2 // indirect
 	google.golang.org/grpc v1.42.0
@@ -26,7 +26,7 @@ require (
 	k8s.io/klog/v2 v2.30.0
 )
 
-require github.com/getoutreach/gobox v1.38.0
+require github.com/getoutreach/gobox v1.41.5
 
 require (
 	github.com/Azure/go-autorest v14.2.0+incompatible // indirect
@@ -102,7 +102,7 @@ require (
 	gopkg.in/alexcesaro/statsd.v2 v2.0.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
-	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b // indirect
+	gopkg.in/yaml.v3 v3.0.1 // indirect
 	inet.af/netaddr v0.0.0-20210511181906-37180328850c // indirect
 )
 

@@ -2,11 +2,13 @@
   // Please consider contributing back all added
   // settings to bootstrap!
   ///Block(settings)
+
   ///EndBlock(settings)
   "go.lintTool": "golangci-lint",
   "go.lintFlags": [],
   "go.formatTool": "goimports",
   "go.useLanguageServer": true,
+  "go.testEnvFile": "${workspaceFolder}/.vscode/private.env",
   "go.alternateTools": {
     // This makes sure we use the correct version
     // of golangci-lint in our editors.
@@ -21,6 +23,9 @@
   "[dockerfile]": {
     "editor.defaultFormatter": "ms-azuretools.vscode-docker"
   },
+  "[markdown]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
   "[proto3]": {
     "editor.defaultFormatter": "zxh404.vscode-proto3"
   },
@@ -29,5 +34,11 @@
   },
   "gopls": {
     "build.buildFlags": ["-tags=or_test,or_dev,or_e2e,or_int"]
+  },
+  "[terraform]": {
+    "editor.defaultFormatter": "hashicorp.terraform"
+  },
+  "protoc": {
+    "options": ["--proto_path=${workspaceRoot}/api"]
   }
 }
