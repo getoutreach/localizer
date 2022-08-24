@@ -16,7 +16,7 @@ require (
 	github.com/urfave/cli/v2 v2.6.0
 	golang.org/x/crypto v0.0.0-20220408190544-5352b0902921
 	google.golang.org/genproto v0.0.0-20210831024726-fe130286e0e2 // indirect
-	google.golang.org/grpc v1.42.0
+	google.golang.org/grpc v1.49.0
 	google.golang.org/protobuf v1.28.0
 
 	// kubernetes deps
