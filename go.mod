@@ -23,7 +23,7 @@ require (
 	k8s.io/api v0.23.0
 	k8s.io/apimachinery v0.23.0
 	k8s.io/client-go v0.23.0
-	k8s.io/klog/v2 v2.30.0
+	k8s.io/klog/v2 v2.80.0
 )
 
 require github.com/getoutreach/gobox v1.41.5
