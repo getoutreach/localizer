@@ -2,7 +2,7 @@
 golang 1.17.9
 nodejs 16.13.0
 terraform 0.13.5
-ruby 2.6.6
+ruby 2.7.5
 protoc 3.19.1
 # Note: Versions in this block override the above. Be EXTREMELY
 # CAREFUL with this. If you override a standard version you are
