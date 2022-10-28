@@ -4,8 +4,7 @@
     "esbenp.prettier-vscode",
     "hashicorp.terraform",
     "golang.go",
-    "heptio.jsonnet",
-    "xrc-inc.jsonnet-formatter",
+    "Grafana.vscode-jsonnet",
     "timonwong.shellcheck",
     "zxh404.vscode-proto3",
     "redhat.vscode-yaml",
@@ -13,9 +12,9 @@
     "foxundermoon.shell-format"
 
     // Please consider contributing back all recommended
-    // extensions to bootstrap!
-    ///Block(extensions)
+    // extensions to stencil!
+    // <<Stencil::Block(extensions)>>
 
-    ///EndBlock(extensions)
+    // <</Stencil::Block>>
   ]
 }

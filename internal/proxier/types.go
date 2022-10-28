@@ -1,3 +1,4 @@
+// Copyright 2022 Outreach Corporation. All Rights Reserved.
 // Copyright 2020 Jared Allard
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -11,11 +12,13 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+
+// Description: This file has the package proxier.
 package proxier
 
 import (
 	"fmt"
-	"net"
+	"net/netip"
 
 	"k8s.io/client-go/tools/portforward"
 )
@@ -90,7 +93,7 @@ type PortForwardConnection struct {
 	StatusReason string
 
 	// IP that this port-forward allocates
-	IP        net.IP
+	IP        netip.Addr
 	Hostnames []string
 
 	// Ports is a local -> remote port list

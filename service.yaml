@@ -1,18 +1,4 @@
 name: localizer
-reportingTeam: fnd-dt
-description: A no-frills local development approach for Kubernetes powered Developer Environments.
-oss: true
-slack: ""
-library: true
-commands:
-  - localizer
-circleAPIKey: ""
-lintroller: bronze
-tracing: honeycomb
-metrics: datadog
-releaseType: ""
-deployTo:
-  environments: []
 arguments:
   circleAPIKey: ""
   commands:
@@ -22,10 +8,11 @@ arguments:
     optional: []
     required: []
   description: A no-frills local development approach for Kubernetes powered Developer Environments.
+  go-protoc-imports: []
   grpcClients: []
   kubernetes:
     groups: []
-  lintroller: bronze
+  lintroller: silver
   metrics: datadog
   opslevel:
     confluenceSpaceKey: DTSS
@@ -34,31 +21,55 @@ arguments:
     designDocumentLink: ""
   oss: true
   releaseOptions:
-    allowMajorVersions: null
+    allowMajorVersions: false
     enablePrereleases: false
+    prereleasesBranch: ""
   reportingTeam: fnd-dt
   resources: {}
   service: false
-  tracing: honeycomb
+  slack: ""
+  terraform:
+    datadog:
+      grpc:
+        evaluationWindow: ""
+        latency:
+          percentiles:
+            highTraffic: 0
+            lowTraffic: 0
+          thresholds:
+            highTraffic: 0
+            lowTraffic: 0
+        lowTrafficCountThreshold: 0
+        qos:
+          thresholds:
+            highTraffic: 0
+            lowTraffic: 0
+        tags: []
+      http:
+        evaluationWindow: ""
+        percentiles:
+          highTraffic: 0
+          lowTraffic: 0
+        thresholds:
+          highTraffic: 0
+          lowCount: 0
+          lowTraffic: 0
+      pods:
+        thresholds:
+          availableLowCount: 0
+  tracing: opentelemetry
   tutorial: false
+  validation: false
   vaultSecrets:
     - deploy/honeycomb_new/%(environment)s/honeycomb
     - deploy/launchdarkly/%(environment)s/launchdarkly
     - deploy/mint/%(environment)s/validation/mint-validator-payload
     - deploy/flagship-shared-secret/%(environment)s/authn-flagship-payload
 modules:
-  - name: github.com/getoutreach/stencil-opslevel
   - name: github.com/getoutreach/stencil-outreach
   - name: github.com/getoutreach/stencil-circleci
   - name: github.com/getoutreach/stencil-actions
+  - name: github.com/getoutreach/stencil-discovery
   - name: github.com/getoutreach/stencil-base
   - name: github.com/getoutreach/stencil-golang
-opsLevel:
-  serviceTier: 0
-  lifecycle: ""
-  confluenceSpaceKey: DTSS
-  pagerDutyLink: ""
-  datadogDashboards:
-    mainLink: ""
-    custom: []
-  designDocumentLink: ""
+migrated: true

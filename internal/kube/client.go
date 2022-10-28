@@ -1,3 +1,4 @@
+// Copyright 2022 Outreach Corporation. All Rights Reserved.
 // Copyright 2020 Jared Allard
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -11,6 +12,8 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+
+// Description: This file has the package kube.
 package kube
 
 import (
@@ -96,7 +99,7 @@ type ResolvedServicePort struct {
 
 // ResolveServicePorts converts named ports into their true
 // format. TargetPort's that have are named become their integer equivalents
-func ResolveServicePorts(log logrus.FieldLogger, s *corev1.Service) ([]ResolvedServicePort, error) { //nolint:funlen
+func ResolveServicePorts(log logrus.FieldLogger, s *corev1.Service) ([]ResolvedServicePort, error) { //nolint:funlen,lll // Why: there are no reusable parts to extract
 	store := kevents.GlobalCache.Core().V1().Endpoints().Informer().GetStore()
 
 	hasNamedPorts := false
@@ -207,7 +210,7 @@ func satisfiesSelector(obj interface{}, matches map[string]string) (bool, error)
 
 // ResolveServicePortsFromControllers looks up the controllers of a given service
 // and uses their containerPort declarations to resolve named endpoints of a service
-func ResolveServicePortsFromControllers(log logrus.FieldLogger, s *corev1.Service) ([]ResolvedServicePort, error) { //nolint:funlen
+func ResolveServicePortsFromControllers(log logrus.FieldLogger, s *corev1.Service) ([]ResolvedServicePort, error) { //nolint:funlen,lll // Why: there are no reusable parts to extract
 	controllers, err := FindControllersForService(log, s)
 	if err != nil {
 		return nil, err
@@ -308,7 +311,7 @@ func ResolveServicePortsFromControllers(log logrus.FieldLogger, s *corev1.Servic
 // Controllers are deployments/statefulsets that match the service's selector in their
 // pod templates.
 func FindControllersForService(log logrus.FieldLogger, s *corev1.Service) ([]interface{}, error) {
-	// TODO: Search all types? Not sure how to handle this.
+	// TODO(jaredallard): Search all types? Not sure how to handle this.
 	items := []interface{}{}
 	items = append(items, kevents.GlobalCache.Apps().V1().StatefulSets().Informer().GetStore().List()...)
 	items = append(items, kevents.GlobalCache.Apps().V1().Deployments().Informer().GetStore().List()...)
@@ -320,7 +323,7 @@ func FindControllersForService(log logrus.FieldLogger, s *corev1.Service) ([]int
 	for _, obj := range items {
 		b, err := satisfiesSelector(obj, s.Spec.Selector)
 		if err != nil {
-			// TODO: add more context
+			// TODO(jaredallard): add more context
 			log.WithError(err).Warn("failed to consider controller")
 			continue
 		}

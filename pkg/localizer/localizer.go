@@ -1,3 +1,7 @@
+// Copyright 2022 Outreach Corporation. All Rights Reserved.
+
+// Description: This file has the package localizer.
+
 // Package localizer is meant to contain useful helper functions, variables, and
 // constants in order to better programatically interact with localizer.
 package localizer

@@ -1,3 +1,4 @@
+// Copyright 2022 Outreach Corporation. All Rights Reserved.
 // Copyright 2020 Jared Allard
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -11,6 +12,9 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+
+// Description: This file has the package api.
+
 package api
 
 //go:generate ../scripts/shell-wrapper.sh protoc.sh ./v1.proto

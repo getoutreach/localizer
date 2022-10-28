@@ -30,6 +30,6 @@ plugins:
         - "dist/*.tar.gz"
         - "dist/checksums.txt"
 
-  ### Block(customReleasePlugins)
+  ## <<Stencil::Block(customReleasePlugins)>>
 
-  ### EndBlock(customReleasePlugins)
+  ## <</Stencil::Block>>

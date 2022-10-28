@@ -26,9 +26,9 @@ import (
 	"k8s.io/klog/v2"
 
 	// Place any extra imports for your startup code here
-	///Block(imports)
+	// <<Stencil::Block(imports)>>
 	logrusr "github.com/bombsimon/logrusr/v2"
-	///EndBlock(imports)
+	// <</Stencil::Block>>
 )
 
 // HoneycombTracingKey gets set by the Makefile at compile-time which is pulled
@@ -39,32 +39,35 @@ var HoneycombTracingKey = "NOTSET" //nolint:gochecknoglobals // Why: We can't co
 // down by devconfig.sh.
 var TeleforkAPIKey = "NOTSET" //nolint:gochecknoglobals // Why: We can't compile in things as a const.
 
-///Block(honeycombDataset)
+// <<Stencil::Block(honeycombDataset)>>
+
+// HoneycombDataset is a constant denoting the dataset that traces should be stored
+// in in honeycomb.
 const HoneycombDataset = ""
 
-///EndBlock(honeycombDataset)
+// <</Stencil::Block>>
 
-///Block(global)
+// <<Stencil::Block(global)>>
 
-///EndBlock(global)
+// <</Stencil::Block>>
 
 func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	log := logrus.New()
 
-	///Block(init)
+	// <<Stencil::Block(init)>>
 
-	///EndBlock(init)
+	// <</Stencil::Block>>
 
 	app := cli.App{
 		Version: oapp.Version,
 		Name:    "localizer",
-		///Block(app)
+		// <<Stencil::Block(app)>>
 		EnableBashCompletion: true,
-		///EndBlock(app)
+		// <</Stencil::Block>>
 	}
 	app.Flags = []cli.Flag{
-		///Block(flags)
+		// <<Stencil::Block(flags)>>
 		// Note: KUBECONFIG is respected, but we don't allow passing a
 		// CLI argument to reduce the complexity and re-parsing of it.
 		&cli.StringFlag{
@@ -99,16 +102,16 @@ func main() {
 			Name:  "namespace",
 			Usage: "Restrict forwarding to the given namespace. (default: all namespaces)",
 		},
-		///EndBlock(flags)
+		// <</Stencil::Block>>
 	}
 	app.Commands = []*cli.Command{
-		///Block(commands)
+		// <<Stencil::Block(commands)>>
 		NewListCommand(log),
 		NewExposeCommand(log),
-		///EndBlock(commands)
+		// <</Stencil::Block>>
 	}
 
-	///Block(postApp)
+	// <<Stencil::Block(postApp)>>
 	log.Formatter = &logrus.TextFormatter{
 		ForceColors: true,
 	}
@@ -171,7 +174,7 @@ func main() {
 		})
 		return srv.Run(ctx, log)
 	}
-	///EndBlock(postApp)
+	// <</Stencil::Block>>
 
 	// Insert global flags, tracing, updating and start the application.
 	gcli.HookInUrfaveCLI(ctx, cancel, &app, log, HoneycombTracingKey, HoneycombDataset, TeleforkAPIKey)

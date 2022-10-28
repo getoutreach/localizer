@@ -4,6 +4,6 @@ _ := $(shell ./scripts/devbase.sh)
 
 include .bootstrap/root/Makefile
 
-###Block(targets)
+## <<Stencil::Block(targets)>>
 
-###EndBlock(targets)
+## <</Stencil::Block>>

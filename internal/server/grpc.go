@@ -1,3 +1,4 @@
+// Copyright 2022 Outreach Corporation. All Rights Reserved.
 // Copyright 2020 Jared Allard
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -11,6 +12,8 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+
+// Description: This file has the package server.
 package server
 
 import (
@@ -23,6 +26,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/reflection"
 
 	"github.com/getoutreach/localizer/api"
@@ -56,7 +60,7 @@ func (g *GRPCService) CleanupPreviousInstance(ctx context.Context, log logrus.Fi
 	defer cancel()
 
 	log.Info("checking if an instance of localizer is already running")
-	client, closer, err := localizer.Connect(ctx, grpc.WithBlock(), grpc.WithInsecure())
+	client, closer, err := localizer.Connect(ctx, grpc.WithBlock(), grpc.WithTransportCredentials(insecure.NewCredentials()))
 
 	// if we made a connection, see if it's responding to pings
 	// eventually we can expose useful information here?
@@ -73,7 +77,7 @@ func (g *GRPCService) CleanupPreviousInstance(ctx context.Context, log logrus.Fi
 }
 
 // Run starts a grpc server with the internal server handler
-func (g *GRPCService) Run(ctx context.Context, log logrus.FieldLogger) error { //nolint:funlen
+func (g *GRPCService) Run(ctx context.Context, log logrus.FieldLogger) error {
 	if _, err := os.Stat(localizer.Socket); err == nil {
 		// if we found an existing instance, attempt to cleanup after it
 		if err := g.CleanupPreviousInstance(ctx, log); err != nil {
