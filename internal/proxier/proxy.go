@@ -332,7 +332,7 @@ func (p *Proxier) List(ctx context.Context) ([]ServiceStatus, error) {
 	statuses := make([]ServiceStatus, 0)
 	for _, pf := range p.worker.portForwards {
 		ip := pf.IP.String()
-		if len(pf.IP) == 0 {
+		if !pf.IP.IsValid() {
 			ip = ""
 		}
 

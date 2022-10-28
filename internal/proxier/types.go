@@ -18,7 +18,7 @@ package proxier
 
 import (
 	"fmt"
-	"net"
+	"net/netip"
 
 	"k8s.io/client-go/tools/portforward"
 )
@@ -93,7 +93,7 @@ type PortForwardConnection struct {
 	StatusReason string
 
 	// IP that this port-forward allocates
-	IP        net.IP
+	IP        netip.Addr
 	Hostnames []string
 
 	// Ports is a local -> remote port list

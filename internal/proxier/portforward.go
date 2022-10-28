@@ -22,6 +22,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/netip"
 	"os"
 	"os/exec"
 	"runtime"
@@ -76,14 +77,14 @@ func NewPortForwarder(ctx context.Context, k kubernetes.Interface,
 		return nil, nil, nil, errors.Wrap(err, "failed to parse provided cidr")
 	}
 
-	prefix, err := ipamInstance.NewPrefix(opts.IPCidr)
+	prefix, err := ipamInstance.NewPrefix(ctx, opts.IPCidr)
 	if err != nil {
 		return nil, nil, nil, errors.Wrap(err, "failed to create ip pool")
 	}
 
 	defaultIP := "127.0.0.1"
 	if cidr.Contains(net.ParseIP(defaultIP)) {
-		_, err = ipamInstance.AcquireSpecificIP(prefix.Cidr, defaultIP)
+		_, err = ipamInstance.AcquireSpecificIP(ctx, prefix.Cidr, defaultIP)
 		if err != nil {
 			return nil, nil, nil, errors.Wrap(err, "failed to create ip pool")
 		}
@@ -251,11 +252,11 @@ func (w *worker) CreatePortForward(ctx context.Context, req *CreatePortForwardRe
 	}()
 
 	// TODO(jaredallard): need to release on error
-	ipAddress, err := w.ippool.AcquireIP(w.ipCidr)
+	ipAddress, err := w.ippool.AcquireIP(ctx, w.ipCidr)
 	if err != nil {
 		return errors.Wrap(err, "failed to allocate IP")
 	}
-	pf.IP = ipAddress.IP.IPAddr().IP
+	pf.IP = ipAddress.IP
 
 	// We only need to create alias on darwin, on other platforms
 	// lo0 becomes lo and routes the full /8
@@ -360,13 +361,13 @@ func (w *worker) setPortForwardConnectionStatus(_ context.Context, si ServiceInf
 	w.portForwards[key] = pf
 }
 
-func (w *worker) stopPortForward(_ context.Context, conn *PortForwardConnection) error {
+func (w *worker) stopPortForward(ctx context.Context, conn *PortForwardConnection) error {
 	if conn.pf != nil {
 		conn.pf.Close()
 	}
 
 	errs := make([]error, 0)
-	if len(conn.IP) > 0 {
+	if conn.IP.IsValid() {
 		// If we are on a platform that needs aliases
 		// then we need to remove it
 		if runtime.GOOS == "darwin" && os.Getenv("DISABLE_LOOPBACK_ALIAS") == "" {
@@ -382,7 +383,7 @@ func (w *worker) stopPortForward(_ context.Context, conn *PortForwardConnection)
 			}
 		}
 
-		err := w.ippool.ReleaseIPFromPrefix(w.ipCidr, conn.IP.String())
+		err := w.ippool.ReleaseIPFromPrefix(ctx, w.ipCidr, conn.IP.String())
 		if err != nil {
 			errs = append(errs, errors.Wrap(err, "failed to release ip address"))
 		}
@@ -396,7 +397,7 @@ func (w *worker) stopPortForward(_ context.Context, conn *PortForwardConnection)
 			errs = append(errs, errors.Wrap(err, "failed to save hosts file after modification(s)"))
 		}
 
-		conn.IP = net.IP{}
+		conn.IP = netip.Addr{}
 	}
 
 	// if we have errors, return them
