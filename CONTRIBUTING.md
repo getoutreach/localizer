@@ -1,20 +1,20 @@
 # localizer
 
-<!--- Block(customGeneralInformation) -->
+<!-- <<Stencil::Block(customGeneralInformation)>> -->
 
-<!--- EndBlock(customGeneralInformation) -->
+<!-- <</Stencil::Block>> -->
 
 ## Prerequisites
 
-<!--- Block(customPrerequisites) -->
+<!-- <<Stencil::Block(customPrerequisites)>> -->
 
-<!--- EndBlock(customPrerequisites) -->
+<!-- <</Stencil::Block>> -->
 
 ## Building and Testing
 
-<!--- Block(customBuildingAndTesting) -->
+<!-- <<Stencil::Block(customBuildingAndTesting)>> -->
 
-<!--- EndBlock(customBuildingAndTesting) -->
+<!-- <</Stencil::Block>> -->
 
 ### Replacing a Remote Version of the a Package with Local Version
 

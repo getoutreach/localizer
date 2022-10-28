@@ -1,16 +1,6 @@
-// Copyright 2020 Jared Allard
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Copyright 2022 Outreach Corporation. All Rights Reserved.
+
+// Description: This file has the package expose.
 package expose
 
 import (
@@ -79,7 +69,10 @@ func (c *Client) Start(ctx context.Context) error {
 		p := obj.(*corev1.Pod)
 
 		if p.Labels[ExposedPodLabel] == "true" {
-			key, _ := cache.MetaNamespaceKeyFunc(p) //nolint:errcheck
+			key, keyErr := cache.MetaNamespaceKeyFunc(p)
+			if keyErr != nil {
+				c.log.WithError(keyErr).Warn("failed to get key")
+			}
 			log := c.log.WithField("pod", key)
 			log.Warn("removing abandoned localizer pod")
 
@@ -144,7 +137,7 @@ func (c *Client) scaleObject(ctx context.Context, scaledObj scaledObjectType, re
 		return errors.Wrap(err, "failed to marshal scale patch body")
 	}
 
-	// TODO: build client from self link one day
+	// TODO(jaredallard): build client from self link one day
 	req := c.k.AppsV1().RESTClient().Patch(types.JSONPatchType).Resource(scaledObj.Resource).
 		Namespace(scaledObj.GetNamespace()).Name(scaledObj.GetName()).Body(payloadBytes)
 
@@ -194,7 +187,7 @@ func getReplicasFromObject(obj interface{}) (int, error) {
 
 // getServiceControllers finds controllers that create pods for a given service
 // and returns them
-func (c *Client) getServiceControllers(_ context.Context, namespace, serviceName string) ([]scaledObjectType, error) { //nolint:funlen
+func (c *Client) getServiceControllers(_ context.Context, namespace, serviceName string) ([]scaledObjectType, error) {
 	obj, exists, err := c.svcStore.GetByKey(fmt.Sprintf("%s/%s", namespace, serviceName))
 	if err != nil {
 		return nil, err

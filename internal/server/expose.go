@@ -1,16 +1,6 @@
-// Copyright 2020 Jared Allard
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Copyright 2022 Outreach Corporation. All Rights Reserved.
+
+// Description: This file has the package server.
 package server
 
 import (
@@ -48,7 +38,7 @@ func mapPorts(portMap []string, log logrus.FieldLogger, servicePorts []kube.Reso
 			return errors.Wrapf(err, "failed to parse port map '%s'", portOverride)
 		}
 
-		// TODO: this is slow...
+		// TODO(jaredallard): this is slow...
 		for i, sp := range servicePorts {
 			log.Debugf("checking if we need to map %s, using %d:%d", sp.TargetPort.String(), rem, local)
 			if uint(servicePorts[i].TargetPort.IntValue()) == uint(rem) {
@@ -109,7 +99,7 @@ func getKey(namespace, serviceName string) string {
 	return fmt.Sprintf("%s/%s", namespace, serviceName)
 }
 
-func (e *Exposer) worker() { //nolint:lostcancel,funlen
+func (e *Exposer) worker() {
 	// when this exits we're done
 	defer close(e.doneChan)
 
@@ -134,7 +124,7 @@ func (e *Exposer) worker() { //nolint:lostcancel,funlen
 
 			exp, err := e.e.Expose(e.parentCtx, expMsg.ports, expMsg.namespace, expMsg.serviceName)
 			if err != nil {
-				// TODO: send this error back
+				// TODO(jaredallard): send this error back
 				e.log.WithError(err).Error("failed to create expose")
 				continue
 			}
@@ -193,7 +183,7 @@ func (e *Exposer) Start(ports []kube.ResolvedServicePort, namespace, serviceName
 		serviceName: serviceName,
 	}
 
-	// TODO: propregate error
+	// TODO(jaredallard): propregate error
 	return nil
 }
 

@@ -1,16 +1,6 @@
-// Copyright 2020 Jared Allard
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Copyright 2022 Outreach Corporation. All Rights Reserved.
+
+// Description: This file has the package expose.
 package expose
 
 import (
@@ -91,7 +81,7 @@ func (p *ServiceForward) createServerPortForward(ctx context.Context, po *corev1
 	return kube.CreatePortForward(ctx, p.c.k.CoreV1().RESTClient(), p.c.kconf, po, "0.0.0.0", []string{fmt.Sprintf("%d:2222", localPort)})
 }
 
-func (p *ServiceForward) createServerPod(ctx context.Context) (func(), *corev1.Pod, error) { //nolint:funlen
+func (p *ServiceForward) createServerPod(ctx context.Context) (func(), *corev1.Pod, error) { //nolint:funlen,lll // Why: there are no reusable parts to extract
 	// map the service ports into containerPorts, using the
 	containerPorts := make([]corev1.ContainerPort, len(p.Ports))
 	for i, port := range p.Ports {
@@ -186,8 +176,9 @@ func (p *ServiceForward) createServerPod(ctx context.Context) (func(), *corev1.P
 	cleanupFn := func() {
 		p.log.Debug("cleaning up pod")
 		// cleanup the pod
-		//nolint:errcheck
-		p.c.k.CoreV1().Pods(p.Namespace).Delete(context.Background(), po.Name, metav1.DeleteOptions{})
+		if err := p.c.k.CoreV1().Pods(p.Namespace).Delete(context.Background(), po.Name, metav1.DeleteOptions{}); err != nil {
+			p.log.WithError(err).Warn("failed to delete pod")
+		}
 	}
 
 	p.log.Infof("created pod %s", po.ObjectMeta.Name)
@@ -264,7 +255,7 @@ func (p *ServiceForward) createTransport(ctx context.Context, po *corev1.Pod,
 }
 
 // Start starts forwarding a service, this blocks
-func (p *ServiceForward) Start(ctx context.Context) error { //nolint:funlen
+func (p *ServiceForward) Start(ctx context.Context) error {
 	ports := make([]string, len(p.Ports))
 	for i, port := range p.Ports {
 		prt := int(port.TargetPort.IntVal)

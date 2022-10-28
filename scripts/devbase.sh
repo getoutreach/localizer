@@ -4,7 +4,7 @@ set -e
 
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 libDir="$DIR/../.bootstrap"
-lockfile="$DIR/../bootstrap.lock"
+lockfile="$DIR/../stencil.lock"
 
 # get_field_from_yaml reads a field from a yaml file using either go-yq or python-yq
 get_field_from_yaml() {
@@ -20,15 +20,18 @@ get_field_from_yaml() {
   fi
 }
 
-version=$(get_field_from_yaml .versions.devbase "$lockfile")
+# Use the version of devbase from stencil
+version=$(get_field_from_yaml '.modules[] | select(.name == "github.com/getoutreach/devbase") | .version' "$lockfile")
 existingVersion=$(cat "$libDir/.version" 2>/dev/null || true)
 
 if [[ ! -e $libDir ]] || [[ $existingVersion != "$version" ]] || [[ ! -e "$libDir/.version" ]]; then
   rm -rf "$libDir" || true
 
-  git clone -q --single-branch --branch "$version" git@github.com:getoutreach/devbase "$libDir" >/dev/null
+  git clone -q --single-branch --branch "$version" git@github.com:getoutreach/devbase \
+    "$libDir" >/dev/null
+
   echo -n "$version" >"$libDir/.version"
 
   # Don't let devbase be confused by the existence of one there :(
-  rm "$libDir/service.yaml"
+  rm "$libDir/service.yaml" || true # ignore errors
 fi

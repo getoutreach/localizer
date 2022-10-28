@@ -1,16 +1,6 @@
-// Copyright 2020 Jared Allard
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Copyright 2022 Outreach Corporation. All Rights Reserved.
+
+// Description: This file has the package proxier.
 package proxier
 
 import (
@@ -75,7 +65,7 @@ type ProxyOpts struct {
 }
 
 // NewProxier creates a new proxier instance
-func NewProxier(ctx context.Context, k kubernetes.Interface, kconf *rest.Config, log logrus.FieldLogger, opts *ProxyOpts) (*Proxier, error) { //nolint:lll
+func NewProxier(ctx context.Context, k kubernetes.Interface, kconf *rest.Config, log logrus.FieldLogger, opts *ProxyOpts) (*Proxier, error) { //nolint:lll // Why: names can be long
 	svcInformer := kevents.GlobalCache.Core().V1().Services().Informer()
 	endpointsInformer := kevents.GlobalCache.Core().V1().Endpoints().Informer()
 
@@ -137,7 +127,7 @@ func (p *Proxier) IsStable() bool {
 }
 
 // Start starts the proxier
-// TODO: replace raw cluster domain with options struct, maybe also
+// TODO(jaredallard): replace raw cluster domain with options struct, maybe also
 // move into NewProxier
 func (p *Proxier) Start(ctx context.Context) error {
 	defer p.queue.ShutDown()
@@ -198,7 +188,7 @@ func (p *Proxier) processNextWorkItem() bool {
 	return true
 }
 
-func (p *Proxier) reconcile(key string) error { //nolint:funlen
+func (p *Proxier) reconcile(key string) error {
 	o, exists, err := p.svcInformer.GetStore().GetByKey(key)
 	if err != nil {
 		return err
@@ -264,7 +254,7 @@ func (p *Proxier) reconcile(key string) error { //nolint:funlen
 	return nil
 }
 
-func (p *Proxier) createPortforward(svc *corev1.Service, recreate string) { //nolint:funlen
+func (p *Proxier) createPortforward(svc *corev1.Service, recreate string) {
 	info := ServiceInfo{Namespace: svc.Namespace, Name: svc.Name}
 	// resolve the service ports using endpoints if possible.
 	resolvedPorts, err := kube.ResolveServicePorts(p.log, svc)

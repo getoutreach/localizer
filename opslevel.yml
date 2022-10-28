@@ -9,22 +9,22 @@ version: 1
 service:
   name: localizer
   product: Outreach
-  owner: fnd_dt
+  owner: fnd-dt
   language: Golang
   framework: stencil
   description: >
     A no-frills local development approach for Kubernetes powered Developer Environments.
-  ###Block(extraServiceMetadata)
-  ###EndBlock(extraServiceMetadata)
+  ## <<Stencil::Block(extraServiceMetadata)>>
+  ## <</Stencil::Block>>
   aliases:
-    ###Block(extraAliases)
+    ## <<Stencil::Block(extraAliases)>>
 
-    ###EndBlock(extraAliases)
+    ## <</Stencil::Block>>
     - localizer
   tags:
-    ###Block(extraTags)
+    ## <<Stencil::Block(extraTags)>>
 
-    ###EndBlock(extraTags)
+    ## <</Stencil::Block>>
     - key: repo
       value: "https://github.com/getoutreach/localizer"
     - key: reporting_team
@@ -34,7 +34,7 @@ service:
     - key: name
       value: "localizer"
     - key: stencil_version
-      value: "v1.21.1"
+      value: "v1.28.1"
     - key: golang_version
       value: "1.17.9"
     - key: tutorial

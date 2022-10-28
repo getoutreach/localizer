@@ -12,6 +12,6 @@ indent_style = tab
 indent_style = space
 indent_size  = 2
 
-###Block(editorconfig)
+## <<Stencil::Block(editorconfig)>>
 
-###EndBlock(editorconfig)
+## <</Stencil::Block>>

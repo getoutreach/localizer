@@ -2,6 +2,5 @@
 
 // Description: This file has the package api.
 
+// Package api has message structs
 package api
-
-//go:generate ../scripts/shell-wrapper.sh protoc.sh ./v1.proto

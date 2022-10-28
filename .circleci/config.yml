@@ -2,7 +2,7 @@
 # syntax, such as anchors, will be fixed automatically.
 version: 2.1
 orbs:
-  shared: getoutreach/shared@2.2.0
+  shared: getoutreach/shared@2.5.1
 
 # Extra contexts to expose to all jobs below
 contexts: &contexts
@@ -14,68 +14,70 @@ contexts: &contexts
   - opslevel-credentials
   - vault-dev
   - confluence
-  ###Block(extraContexts)
+  - circleci-credentials
+  ## <<Stencil::Block(extraContexts)>>
 
-  ###EndBlock(extraContexts)
+  ## <</Stencil::Block>>
+
+# Branches used for releasing code, pre-release or not
+release_branches: &release_branches
+  - "main"
 
 jobs:
   {}
-  ###Block(circleJobs)
+  ## <<Stencil::Block(circleJobs)>>
 
-  ###EndBlock(circleJobs)
+  ## <</Stencil::Block>>
 
   ### Start jobs inserted by other modules
   ### End jobs inserted by other modules
 
 workflows:
   version: 2
-  ###Block(circleWorkflows)
+  ## <<Stencil::Block(circleWorkflows)>>
 
-  ###EndBlock(circleWorkflows)
+  ## <</Stencil::Block>>
 
   ### Start workflows inserted by other modules
   ### End workflows inserted by other modules
 
   release:
     jobs:
-      ###Block(circleWorkflowJobs)
+      ## <<Stencil::Block(circleWorkflowJobs)>>
 
-      ###EndBlock(circleWorkflowJobs)
+      ## <</Stencil::Block>>
       ### Start jobs inserted by other modules
       ### End jobs inserted by other modules
       - shared/release: &release
           dryrun: false
           context: *contexts
-          ###Block(circleReleaseExtra)
+          ## <<Stencil::Block(circleReleaseExtra)>>
 
-          ###EndBlock(circleReleaseExtra)
+          ## <</Stencil::Block>>
           requires:
-            ###Block(circleReleaseRequires)
+            ## <<Stencil::Block(circleReleaseRequires)>>
 
-            ###EndBlock(circleReleaseRequires)
+            ## <</Stencil::Block>>
             - shared/test
           filters:
             branches:
-              only:
-                - master
-                - main
-      # Dryrun release for PRs
+              only: *release_branches
+
+      # Dryrun release for PRs.
       - shared/release:
           <<: *release
           dryrun: true
           filters:
             branches:
-              ignore:
-                - master
-                - main
+              ignore: *release_branches
       - shared/test:
           context: *contexts
           app_name: localizer
           ### Start parameters inserted by other modules
           ### End parameters inserted by other modules
-          ###Block(circleTestExtra)
+          ## <<Stencil::Block(circleTestExtra)>>
 
-          ###EndBlock(circleTestExtra)
+          ## <</Stencil::Block>>
 
       - shared/publish_docs:
           context: *contexts
@@ -84,22 +86,15 @@ workflows:
               ignore: /.*/
             tags:
               only: /v[0-9]+(\.[0-9]+)*(-.*)*/
-      - shared/finalize-coverage:
-          context: *contexts
-          requires:
-            - shared/e2e
-            - shared/test
       - shared/e2e:
           context: *contexts
-          ###Block(circleE2EExtra)
+          ## <<Stencil::Block(circleE2EExtra)>>
 
-          ###EndBlock(circleE2EExtra)
+          ## <</Stencil::Block>>
       - shared/docker:
           context: *contexts
           filters:
             branches:
-              ignore:
-                - master
-                - main
+              ignore: *release_branches
             tags:
               only: /v\d+(\.\d+)*(-.*)*/

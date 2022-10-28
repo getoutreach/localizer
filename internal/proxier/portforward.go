@@ -1,16 +1,6 @@
-// Copyright 2020 Jared Allard
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// Copyright 2022 Outreach Corporation. All Rights Reserved.
+
+// Description: This file has the package proxier.
 package proxier
 
 import (
@@ -62,8 +52,8 @@ type worker struct {
 
 // NewPortForwarder creates a new port-forward worker that handles
 // creating port-forwards and destroying port-forwards.
-//nolint:gocritic,golint,revive // We're OK not naming these.
-// Why: It's okay that we're returning an unexported type, that is by design.
+//
+// nolint:gocritic,golint,revive // Why: It's by design that we're returning an unexported type.
 func NewPortForwarder(ctx context.Context, k kubernetes.Interface,
 	r *rest.Config, log logrus.FieldLogger, opts *ProxyOpts) (chan<- PortForwardRequest, <-chan struct{}, *worker, error) {
 	ipamInstance := ipam.New()
@@ -206,7 +196,7 @@ loop:
 	return pod, nil
 }
 
-func (w *worker) CreatePortForward(ctx context.Context, req *CreatePortForwardRequest) (returnedError error) { //nolint:funlen,gocyclo
+func (w *worker) CreatePortForward(ctx context.Context, req *CreatePortForwardRequest) (returnedError error) { // nolint:funlen,lll // Why: there are no reusable parts to extract
 	serviceKey := req.Service.Key()
 	log := w.log.WithField("service", serviceKey)
 	if req.Endpoint != nil {
@@ -247,7 +237,7 @@ func (w *worker) CreatePortForward(ctx context.Context, req *CreatePortForwardRe
 		}
 	}()
 
-	// TODO: need to release on error
+	// TODO(jaredallard): need to release on error
 	ipAddress, err := w.ippool.AcquireIP(w.ipCidr)
 	if err != nil {
 		return errors.Wrap(err, "failed to allocate IP")
