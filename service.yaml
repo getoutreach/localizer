@@ -1,65 +1,18 @@
 name: localizer
 arguments:
-  circleAPIKey: ""
   commands:
     - localizer
-  commitGuard: false
-  dependencies:
-    optional: []
-    required: []
+  ciOptions:
+    skipDocker: true
+    skipE2e: true
   description: A no-frills local development approach for Kubernetes powered Developer Environments.
-  go-protoc-imports: []
-  grpcClients: []
-  kubernetes:
-    groups: []
   lintroller: silver
   metrics: datadog
   opslevel:
-    confluenceSpaceKey: DTSS
-    datadogDashboards:
-      mainLink: ""
-    designDocumentLink: ""
+    confluenceSpaceKey: DT
   oss: true
-  releaseOptions:
-    allowMajorVersions: false
-    enablePrereleases: false
-    prereleasesBranch: ""
   reportingTeam: fnd-dt
-  resources: {}
   service: false
-  slack: ""
-  terraform:
-    datadog:
-      grpc:
-        evaluationWindow: ""
-        latency:
-          percentiles:
-            highTraffic: 0
-            lowTraffic: 0
-          thresholds:
-            highTraffic: 0
-            lowTraffic: 0
-        lowTrafficCountThreshold: 0
-        qos:
-          thresholds:
-            highTraffic: 0
-            lowTraffic: 0
-        tags: []
-      http:
-        evaluationWindow: ""
-        percentiles:
-          highTraffic: 0
-          lowTraffic: 0
-        thresholds:
-          highTraffic: 0
-          lowCount: 0
-          lowTraffic: 0
-      pods:
-        thresholds:
-          availableLowCount: 0
-  tracing: opentelemetry
-  tutorial: false
-  validation: false
   vaultSecrets:
     - deploy/honeycomb_new/%(environment)s/honeycomb
     - deploy/launchdarkly/%(environment)s/launchdarkly
@@ -72,4 +25,3 @@ modules:
   - name: github.com/getoutreach/stencil-discovery
   - name: github.com/getoutreach/stencil-base
   - name: github.com/getoutreach/stencil-golang
-migrated: true
