@@ -133,30 +133,33 @@ func NewPortForwarder(ctx context.Context, k kubernetes.Interface,
 	return reqChan, doneChan, w, nil
 }
 
+// shutdown shuts down the worker by stopping all port-forwards.
+func (w *worker) shutdown() {
+	// create a temporary context for shutting down
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
+	defer cancel()
+
+	w.log.Infof("stopping %d port-forwards", len(w.portForwards))
+	for info := range w.portForwards {
+		if err := w.DeletePortForward(ctx, &DeletePortForwardRequest{
+			Service:        w.portForwards[info].Service,
+			IsShuttingDown: true,
+		}); err != nil {
+			w.log.WithError(err).Warn("failed to clean up port-forward")
+		}
+	}
+
+	// close our channel(s)
+	close(w.doneChan)
+}
+
 // Start starts the worker process. This is done when the worker is created
 // and should be run in a goroutine if this is created manually.
 func (w *worker) Start(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
-			w.log.Infof("stopping %d port-forwards", len(w.portForwards))
-			for info := range w.portForwards {
-				// create a temporary context for shutting down
-				ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
-				defer cancel()
-
-				err := w.DeletePortForward(ctx, &DeletePortForwardRequest{
-					Service:        w.portForwards[info].Service,
-					IsShuttingDown: true,
-				})
-				if err != nil {
-					w.log.WithError(err).Warn("failed to clean up port-forward")
-				}
-			}
-
-			// close our channel(s)
-			close(w.doneChan)
-
+			w.shutdown()
 			return
 		case req := <-w.reqChan:
 			var serv ServiceInfo
@@ -170,7 +173,6 @@ func (w *worker) Start(ctx context.Context) {
 			}
 
 			log := w.log.WithField("service", serv.Key())
-
 			if err != nil {
 				if errors.Is(err, ErrAlreadyExists) {
 					log.Debug("skipping port-forward creation as it already exists")
