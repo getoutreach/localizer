@@ -55,10 +55,7 @@ func NewGRPCService(opts *RunOpts) *GRPCService {
 	if opts == nil {
 		opts = &RunOpts{}
 	}
-
-	if opts.SkipNamespaces == nil {
-		opts.SkipNamespaces = []string{"kube-system"}
-	}
+	opts.SkipNamespaces = append(opts.SkipNamespaces, "kube-system")
 
 	return &GRPCService{
 		opts: opts,
