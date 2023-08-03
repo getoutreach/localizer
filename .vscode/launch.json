@@ -24,20 +24,41 @@
       "host": "127.0.0.1",
       "port": 42097,
       // <</Stencil::Block>>
+      // Paths to replace when running the debugger. "from" is the host
+      // path and "to" is the path in the devspace.
       "substitutePath": [
         {
+          // Maps the workspace root (the repository directory) to the path that
+          // is compiled into the built binary. Note: This is not impacted by trimpath
+          // because devbase currently uses dlv to compile the source code.
+          // See: https://github.com/getoutreach/devbase/blob/main/shell/debug.sh#L72
           "from": "${workspaceRoot}",
           "to": "/home/dev/app"
         },
+        // Maps the go module cache on the host to the persistent volume used by devspaces.
+        // See the value of `go env GOMODCACHE` on the host and devspace.
         {
-          "from": "${env:HOME}/.asdf/installs/golang/1.19/packages/pkg/mod",
+          "from": "${env:HOME}/.asdf/installs/golang/1.19.11/packages/pkg/mod",
           "to": "/tmp/cache/go/mod/"
         },
         {
-          "from": "${env:HOME}/.asdf/installs/golang/1.19/go/src",
-          "to": "/home/dev/.asdf/installs/golang/1.19/go/src"
+          // Maps the standard library location on the host to the location in the devspace.
+          // This enables debugging standard library code.
+          "from": "${env:HOME}/.asdf/installs/golang/1.19.11/go/src",
+          "to": "/home/dev/.asdf/installs/golang/1.19.11/go/src"
         }
       ]
+    },
+    {
+      "name": "Attach to dev container (in binary mode)",
+      "type": "go",
+      "debugAdapter": "dlv-dap",
+      "request": "attach",
+      "mode": "remote",
+      // <<Stencil::Block(vscodeRemoteDebugDevspaceBinary)>>
+      "host": "127.0.0.1",
+      "port": 42097
+      // <</Stencil::Block>>
     }
     // <<Stencil::Block(vscodeLaunchConfigs)>>
 

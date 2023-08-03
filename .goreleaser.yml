@@ -1,4 +1,4 @@
-# Documentation for this file: http://goreleaser.com
+# yaml-language-server: $schema=https://goreleaser.com/static/schema.json
 before:
   hooks:
     - make dep
@@ -18,6 +18,7 @@ builds:
       - '-X "main.TeleforkAPIKey={{ .Env.TELEFORK_APIKEY }}"'
     env:
       - CGO_ENABLED=0
+
 archives: []
 checksum:
   name_template: "checksums.txt"

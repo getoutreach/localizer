@@ -4,11 +4,10 @@
 # you are reducing compatibility guarantees.
 ## <<Stencil::Block(toolverOverride)>>
 ## <</Stencil::Block>>
-golang 1.19
-nodejs 16.13.0
-terraform 0.13.5
-ruby 2.7.5
+golang 1.19.11
+terraform 1.4.4
 protoc 21.5
+nodejs 18.14.1
 # Note: Versions in this block do not override the default versions above
 # but sometimes you have to declare additional versions of the same tool
 # while leaving the 'default' version intact for the infra.

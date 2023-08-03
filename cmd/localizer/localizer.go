@@ -1,4 +1,4 @@
-// Copyright 2022 Outreach Corporation. All Rights Reserved.
+// Copyright 2023 Outreach Corporation. All Rights Reserved.
 
 // Description: This file is the entrypoint for the localizer CLI
 // command for localizer.
@@ -16,6 +16,7 @@ import (
 	"syscall"
 
 	oapp "github.com/getoutreach/gobox/pkg/app"
+	"github.com/getoutreach/gobox/pkg/cfg"
 	gcli "github.com/getoutreach/gobox/pkg/cli"
 	"github.com/getoutreach/localizer/internal/kevents"
 	"github.com/getoutreach/localizer/internal/kube"
@@ -51,6 +52,7 @@ const HoneycombDataset = ""
 
 // <</Stencil::Block>>
 
+// main is the entrypoint for the localizer CLI.
 func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	log := logrus.New()
@@ -177,5 +179,13 @@ func main() {
 	// <</Stencil::Block>>
 
 	// Insert global flags, tracing, updating and start the application.
-	gcli.HookInUrfaveCLI(ctx, cancel, &app, log, HoneycombTracingKey, HoneycombDataset, TeleforkAPIKey)
+	gcli.Run(ctx, cancel, &app, &gcli.Config{
+		Logger: log,
+		Telemetry: gcli.TelemetryConfig{
+			Otel: gcli.TelemetryOtelConfig{
+				Dataset:         HoneycombDataset,
+				HoneycombAPIKey: cfg.SecretData(HoneycombTracingKey),
+			},
+		},
+	})
 }

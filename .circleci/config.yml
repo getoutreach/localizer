@@ -2,7 +2,13 @@
 # syntax, such as anchors, will be fixed automatically.
 version: 2.1
 orbs:
-  shared: getoutreach/shared@2.5.1
+  shared: getoutreach/shared@2.17.0
+  queue: eddiewebb/queue@1.8.4
+
+parameters:
+  rebuild_cache:
+    type: boolean
+    default: false
 
 # Extra contexts to expose to all jobs below
 contexts: &contexts
@@ -11,11 +17,21 @@ contexts: &contexts
   - docker-registry
   - npm-credentials
   - prismacloud-credentials
-  - opslevel-credentials
   - vault-dev
   - confluence
   - circleci-credentials
+  - tray-webhooks
   ## <<Stencil::Block(extraContexts)>>
+
+  ## <</Stencil::Block>>
+
+# Test configs to pass to test and cache jobs
+test: &test
+  context: *contexts
+  app_name: localizer
+  ### Start parameters inserted by other modules
+  ### End parameters inserted by other modules
+  ## <<Stencil::Block(circleTestExtra)>>
 
   ## <</Stencil::Block>>
 
@@ -41,7 +57,26 @@ workflows:
   ### Start workflows inserted by other modules
   ### End workflows inserted by other modules
 
+  rebuild-cache:
+    triggers:
+      - schedule:
+          # Every day at 00:00 UTC.
+          cron: "0 0 * * *"
+          filters:
+            branches:
+              only:
+                - main
+    jobs:
+      - shared/save_cache: *test
+
+  manual-rebuild-cache:
+    when: << pipeline.parameters.rebuild_cache >>
+    jobs:
+      - shared/save_cache: *test
+
   release:
+    when:
+      not: << pipeline.parameters.rebuild_cache >>
     jobs:
       ## <<Stencil::Block(circleWorkflowJobs)>>
 
@@ -71,21 +106,18 @@ workflows:
             branches:
               ignore: *release_branches
       - shared/test:
-          context: *contexts
-          app_name: localizer
-          ### Start parameters inserted by other modules
-          ### End parameters inserted by other modules
-          ## <<Stencil::Block(circleTestExtra)>>
+          <<: *test
+          ## <<Stencil::Block(circleSharedTestExtra)>>
 
           ## <</Stencil::Block>>
-
       - shared/publish_docs:
           context: *contexts
           filters:
             branches:
-              ignore: /.*/
+              only:
+                - main
             tags:
-              only: /v[0-9]+(\.[0-9]+)*(-.*)*/
+              only: /v\d+(\.\d+)*(-.*)*/
       - shared/e2e:
           context: *contexts
           ## <<Stencil::Block(circleE2EExtra)>>
