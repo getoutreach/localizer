@@ -1,15 +1,15 @@
 {
   "license": "UNLICENSED",
   "devDependencies": {
-    "@semantic-release/commit-analyzer": "^9.0.2",
+    "@semantic-release/commit-analyzer": "^10.0.1",
     "@semantic-release/exec": "^6.0.3",
     "@semantic-release/git": "^10.0.1",
-    "@semantic-release/github": "^8.0.5",
-    "@semantic-release/npm": "^9.0.1",
-    "@semantic-release/release-notes-generator": "^10.0.3",
-    "conventional-changelog-conventionalcommits": "^5.0.0",
-    "prettier": "^2.7.1",
-    "semantic-release": "^19.0.3",
-    "semver": "^7.3.7"
+    "@semantic-release/github": "^9.0.3",
+    "@semantic-release/npm": "^10.0.4",
+    "@semantic-release/release-notes-generator": "^11.0.3",
+    "conventional-changelog-conventionalcommits": "^6.0.0",
+    "prettier": "^2.8.8",
+    "semantic-release": "^21.0.5",
+    "semver": "^7.5.2"
   }
 }
