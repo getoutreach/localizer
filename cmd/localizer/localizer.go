@@ -16,7 +16,6 @@ import (
 	"syscall"
 
 	oapp "github.com/getoutreach/gobox/pkg/app"
-	"github.com/getoutreach/gobox/pkg/cfg"
 	gcli "github.com/getoutreach/gobox/pkg/cli"
 	"github.com/getoutreach/localizer/internal/kevents"
 	"github.com/getoutreach/localizer/internal/kube"
@@ -31,22 +30,6 @@ import (
 	logrusr "github.com/bombsimon/logrusr/v2"
 	// <</Stencil::Block>>
 )
-
-// HoneycombTracingKey gets set by the Makefile at compile-time which is pulled
-// down by devconfig.sh.
-var HoneycombTracingKey = "NOTSET" //nolint:gochecknoglobals // Why: We can't compile in things as a const.
-
-// TeleforkAPIKey gets set by the Makefile at compile-time which is pulled
-// down by devconfig.sh.
-var TeleforkAPIKey = "NOTSET" //nolint:gochecknoglobals // Why: We can't compile in things as a const.
-
-// <<Stencil::Block(honeycombDataset)>>
-
-// HoneycombDataset is a constant denoting the dataset that traces should be stored
-// in in honeycomb.
-const HoneycombDataset = ""
-
-// <</Stencil::Block>>
 
 // <<Stencil::Block(global)>>
 
@@ -78,11 +61,9 @@ func main() {
 			EnvVars: []string{"KUBECONTEXT"},
 		},
 		&cli.StringFlag{
-			Name:        "log-level",
-			Usage:       "Set the log level",
-			EnvVars:     []string{"LOG_LEVEL"},
-			Value:       "DEBUG",
-			DefaultText: "DEBUG",
+			Name:    "log-level",
+			Usage:   "Set the log level. Valid values are: debug",
+			EnvVars: []string{"LOG_LEVEL"},
 		},
 		&cli.StringFlag{
 			Name:        "log-format",
@@ -103,6 +84,10 @@ func main() {
 		&cli.StringFlag{
 			Name:  "namespace",
 			Usage: "Restrict forwarding to the given namespace. (default: all namespaces)",
+		},
+		&cli.StringSliceFlag{
+			Name:  "skip-namespace",
+			Usage: "Skip forwarding services from the following namespace",
 		},
 		// <</Stencil::Block>>
 	}
@@ -140,7 +125,7 @@ func main() {
 			log.SetFormatter(&logrus.JSONFormatter{})
 		}
 
-		klog.SetLogger(logrusr.New(log))
+		klog.SetLogger(logrusr.New(log, logrusr.WithReportCaller()))
 
 		// setup the global kubernetes cache interface
 		config, k, err := kube.GetKubeClient(c.String("context"))
@@ -182,10 +167,7 @@ func main() {
 	gcli.Run(ctx, cancel, &app, &gcli.Config{
 		Logger: log,
 		Telemetry: gcli.TelemetryConfig{
-			Otel: gcli.TelemetryOtelConfig{
-				Dataset:         HoneycombDataset,
-				HoneycombAPIKey: cfg.SecretData(HoneycombTracingKey),
-			},
+			UseDelibird: true,
 		},
 	})
 }

@@ -75,6 +75,10 @@ type CreatePortForwardRequest struct {
 type DeletePortForwardRequest struct {
 	// Service is the service that should delete being port-forwarded
 	Service ServiceInfo
+
+	// IsShuttingDown denotes if the entire process is shutting down as
+	// opposed to a single port-forward, or group, being deleted.
+	IsShuttingDown bool
 }
 
 // PortForwardRequest is a port-forward request, the non-nil struct is the type

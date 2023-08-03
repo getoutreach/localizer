@@ -19,7 +19,6 @@ package proxier
 import (
 	"context"
 	"fmt"
-	"io"
 	"net"
 	"net/http"
 	"net/netip"
@@ -29,6 +28,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/egymgmbh/go-prefix-writer/prefixer"
+	"github.com/fatih/color"
 	"github.com/getoutreach/localizer/pkg/hostsfile"
 	"github.com/metal-stack/go-ipam"
 	"github.com/pkg/errors"
@@ -40,6 +41,22 @@ import (
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
+
+// Contains error types that are returned by the port-forward worker.
+var (
+	// ErrAlreadyExists is returned when we've already created a
+	// port-forward for this service. This can happen when an update event
+	// is recieved for a service that we've already created a port-forward
+	// for. This should generally be ignored but may be useful to log a
+	// warning about.
+	ErrAlreadyExists = errors.New("already have a port-forward for this service")
+)
+
+// bold makes the provided text bold.
+var bold = color.New(color.Bold).SprintFunc()
+
+// red makes the provided text red.
+var red = color.New(color.FgRed).SprintFunc()
 
 type worker struct {
 	k    kubernetes.Interface
@@ -70,7 +87,7 @@ type worker struct {
 // nolint:gocritic,golint,revive // Why: It's by design that we're returning an unexported type.
 func NewPortForwarder(ctx context.Context, k kubernetes.Interface,
 	r *rest.Config, log logrus.FieldLogger, opts *ProxyOpts) (chan<- PortForwardRequest, <-chan struct{}, *worker, error) {
-	ipamInstance := ipam.New()
+	ipamInstance := ipam.New(ctx)
 
 	_, cidr, err := net.ParseCIDR(opts.IPCidr)
 	if err != nil {
@@ -122,9 +139,15 @@ func (w *worker) Start(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
+			w.log.Infof("stopping %d port-forwards", len(w.portForwards))
 			for info := range w.portForwards {
+				// create a temporary context for shutting down
+				ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
+				defer cancel()
+
 				err := w.DeletePortForward(ctx, &DeletePortForwardRequest{
-					Service: w.portForwards[info].Service,
+					Service:        w.portForwards[info].Service,
+					IsShuttingDown: true,
 				})
 				if err != nil {
 					w.log.WithError(err).Warn("failed to clean up port-forward")
@@ -149,6 +172,11 @@ func (w *worker) Start(ctx context.Context) {
 			log := w.log.WithField("service", serv.Key())
 
 			if err != nil {
+				if errors.Is(err, ErrAlreadyExists) {
+					log.Debug("skipping port-forward creation as it already exists")
+					continue
+				}
+
 				log.WithError(err).Errorf("encountered an error: %v", err)
 			}
 		}
@@ -220,7 +248,7 @@ func (w *worker) CreatePortForward(ctx context.Context, req *CreatePortForwardRe
 	// skip port-forwards that are already being managed
 	// unless it's marked as being recreated
 	if _, ok := w.portForwards[serviceKey]; ok && !req.Recreate {
-		return fmt.Errorf("already have a port-forward for this service")
+		return ErrAlreadyExists
 	}
 
 	// The worker is doing meaningful work, not a no-op, note this.
@@ -307,23 +335,41 @@ func (w *worker) CreatePortForward(ctx context.Context, req *CreatePortForwardRe
 			Name(pod.Name).
 			SubResource("portforward").URL())
 
-		fw, err := portforward.NewOnAddresses(dialer, []string{ipAddress.IP.String()}, req.Ports, ctx.Done(), nil, io.Discard, io.Discard)
+		fw, err := portforward.NewOnAddresses(dialer,
+			// Listen information.
+			[]string{ipAddress.IP.String()}, req.Ports,
+
+			// signal channels. We don't pass a stop channel because we handle
+			// calling Close() on context cancel. We don't use a ready channel
+			// because we don't wait for the tunnel to be ready before continuing.
+			nil, nil,
+
+			// Forward port-forwarder output. We don't write stdout because it
+			// contains information we already log (like "forwarding port").
+			// We do write to stderr because it can contain error information
+			// that's useful for debugging why a port-forward is having issues
+			// (or if it failed to start).
+			nil,
+			prefixer.New(os.Stderr, func() string { return red(bold(pod.Key() + " (port-forward) stderr: ")) }),
+		)
 		if err != nil {
 			return errors.Wrap(err, "failed to create port-forward")
 		}
 		pf.pf = fw
 
+		// Spin up a goroutine to forward the ports and trigger a recreate
+		// if it dies.
 		go func() {
 			err := fw.ForwardPorts()
 
-			// if context was canceled (exiting) then we can ignore the error
-			select {
-			case <-ctx.Done():
+			// if the context was canceled, ignore the error and don't attempt
+			// to recreate the tunnel.
+			if ctx.Err() != nil {
 				return
-			default:
 			}
 
 			// otherwise, recreate it
+			log.Debugf("port-forward failed, recreating tunnel: %v", err)
 			w.reqChan <- PortForwardRequest{
 				CreatePortForwardRequest: &CreatePortForwardRequest{
 					Service:        req.Service,
@@ -393,7 +439,7 @@ func (w *worker) stopPortForward(ctx context.Context, conn *PortForwardConnectio
 		}
 
 		// We don't use the context provided because if it's canceled we need to be able to remove it still
-		if err := w.dns.Save(context.Background()); err != nil {
+		if err := w.dns.Save(ctx); err != nil {
 			errs = append(errs, errors.Wrap(err, "failed to save hosts file after modification(s)"))
 		}
 
@@ -431,7 +477,15 @@ func (w *worker) DeletePortForward(ctx context.Context, req *DeletePortForwardRe
 	// now mark it as not being allocated
 	delete(w.portForwards, serviceKey)
 
-	log.Info("stopped port-forward")
+	logFn := log.Info
+	if req.IsShuttingDown {
+		// When shutting down, we don't want to spam the user's screen with
+		// "stopping" messages. So, instead, just debug this information.
+		// The shutdown code will log the number of port-forwards being stopped.
+		logFn = log.Debug
+	}
+
+	logFn("stopped port-forward")
 
 	return nil
 }

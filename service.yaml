@@ -1,7 +1,8 @@
 name: localizer
 arguments:
   commands:
-    - localizer
+    - localizer:
+        delibird: true
   ciOptions:
     skipDocker: true
     skipE2e: true

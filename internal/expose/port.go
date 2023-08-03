@@ -159,7 +159,7 @@ func (p *ServiceForward) createServerPod(ctx context.Context) (func(), *corev1.P
 						},
 					},
 					ReadinessProbe: &corev1.Probe{
-						Handler: corev1.Handler{
+						ProbeHandler: corev1.ProbeHandler{
 							TCPSocket: &corev1.TCPSocketAction{
 								Port: intstr.FromInt(2222),
 							},
