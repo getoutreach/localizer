@@ -75,6 +75,10 @@ type ServiceStatus struct {
 type ProxyOpts struct {
 	ClusterDomain string
 	IPCidr        string
+
+	// SkipNamespaces is a list of namespaces to skip when forwarding
+	// services.
+	SkipNamespaces []string
 }
 
 // NewProxier creates a new proxier instance
@@ -167,7 +171,6 @@ func (p *Proxier) Start(ctx context.Context) error {
 
 func (p *Proxier) runWorker() {
 	for p.processNextWorkItem() {
-
 	}
 }
 
@@ -221,9 +224,26 @@ func (p *Proxier) reconcile(key string) error {
 		}
 		return nil
 	}
-	svc := o.(*corev1.Service)
 
-	if svc.DeletionTimestamp != nil {
+	svc := o.(*corev1.Service)
+	if svc.Spec.Type != corev1.ServiceTypeClusterIP {
+		// Don't process non-clusterip services.
+		return nil
+	}
+
+	var skip bool
+	for _, ns := range p.opts.SkipNamespaces {
+		if ns == svc.Namespace {
+			skip = true
+			break
+		}
+	}
+	if skip {
+		p.log.Debugf("skipping service %s in disabled namespace %s", key, svc.Namespace)
+		return nil
+	}
+
+	if svc.DeletionTimestamp != nil { // deleted, clean up the port-forward
 		p.pfrequest <- PortForwardRequest{
 			DeletePortForwardRequest: &DeletePortForwardRequest{
 				Service: ServiceInfo{Namespace: svc.Namespace, Name: svc.Name},

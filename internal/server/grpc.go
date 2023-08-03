@@ -45,9 +45,18 @@ type RunOpts struct {
 	ClusterDomain string
 	IPCidr        string
 	KubeContext   string
+
+	// SkipNamespaces is a list of namespaces to skip when forwarding
+	// services. Defaults to "kube-system" when passed to NewGRPCService.
+	SkipNamespaces []string
 }
 
 func NewGRPCService(opts *RunOpts) *GRPCService {
+	if opts == nil {
+		opts = &RunOpts{}
+	}
+	opts.SkipNamespaces = append(opts.SkipNamespaces, "kube-system")
+
 	return &GRPCService{
 		opts: opts,
 	}

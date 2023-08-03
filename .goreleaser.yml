@@ -14,8 +14,6 @@ builds:
       - arm64
     ldflags:
       - '-w -s -X "github.com/getoutreach/gobox/pkg/app.Version=v{{ .Version }}"'
-      - '-X "main.HoneycombTracingKey={{ .Env.HONEYCOMB_APIKEY }}"'
-      - '-X "main.TeleforkAPIKey={{ .Env.TELEFORK_APIKEY }}"'
     env:
       - CGO_ENABLED=0
 

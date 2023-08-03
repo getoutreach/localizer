@@ -66,8 +66,9 @@ func NewServiceHandler(ctx context.Context, log logrus.FieldLogger, opts *RunOpt
 	}
 
 	p, err := proxier.NewProxier(ctx, k, kconf, log, &proxier.ProxyOpts{
-		ClusterDomain: opts.ClusterDomain,
-		IPCidr:        opts.IPCidr,
+		ClusterDomain:  opts.ClusterDomain,
+		IPCidr:         opts.IPCidr,
+		SkipNamespaces: opts.SkipNamespaces,
 	})
 	if err != nil {
 		return nil, errors.Wrap(err, "Failed to create proxier")
