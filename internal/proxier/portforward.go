@@ -423,7 +423,7 @@ func (w *worker) stopPortForward(ctx context.Context, conn *PortForwardConnectio
 			args := []string{"lo0", "-alias", ipStr}
 			if err := exec.Command("ifconfig", args...).Run(); err != nil {
 				message := ""
-				var exitError exec.ExitError
+				var exitError *exec.ExitError
 				if ok := errors.As(err, &exitError); ok {
 					message = string(exitError.Stderr)
 				}
