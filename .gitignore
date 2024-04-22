@@ -61,6 +61,9 @@ Pulumi.*.yaml
 # Documentation output
 /apidocs
 
+# Terraform lock files
+.terraform.lock.hcl
+
 ### Start ignores inserted by other modules
 ### End ignores inserted by other modules
 

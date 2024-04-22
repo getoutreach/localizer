@@ -17,4 +17,4 @@
 
 package api
 
-//go:generate ../scripts/shell-wrapper.sh protoc.sh ./v1.proto
+//go:generate ../scripts/shell-wrapper.sh protoc.sh

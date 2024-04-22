@@ -14,6 +14,7 @@
   },
   "go.buildTags": "or_dev",
   "go.testTags": "or_test,or_int,or_e2e",
+  "files.trimTrailingWhitespace": true,
   // This prevents 99% of issues with linters :)
   "editor.formatOnSave": true,
   "shellcheck.customArgs": ["-P", "SCRIPTDIR", "-x"],

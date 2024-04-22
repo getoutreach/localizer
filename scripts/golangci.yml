@@ -9,18 +9,42 @@ linters-settings:
   govet:
     check-shadowing: true
   revive:
-    confidence: 0
+    rules:
+      # Enable the default golint rules. We must include these because
+      # we configure a single rule, which disables the default rules.
+      - name: blank-imports
+      - name: context-as-argument
+      - name: context-keys-type
+      - name: dot-imports
+      - name: error-return
+      - name: error-strings
+      - name: error-naming
+      - name: exported
+      - name: increment-decrement
+      - name: var-naming
+      - name: var-declaration
+      - name: package-comments
+      - name: range
+      - name: receiver-naming
+      - name: time-naming
+      - name: unexported-return
+      - name: indent-error-flow
+      - name: errorf
+      - name: empty-block
+      - name: superfluous-else
+      - name: unreachable-code
+      - name: redefines-builtin-id
+      # While we agree with this rule, right now it would break too many
+      # projects. So, we disable it by default.
+      - name: unused-parameter
+        disabled: true
   gocyclo:
     min-complexity: 25
-  maligned:
-    suggest-new: true
   dupl:
     threshold: 100
   goconst:
     min-len: 3
     min-occurrences: 3
-  misspell:
-    locale: US
   lll:
     line-length: 140
   gocritic:
@@ -84,7 +108,6 @@ issues:
       linters:
         - gocyclo
         - errcheck
-        - dupl
         - gosec
         - funlen
         - gochecknoglobals # Globals in test files are tolerated.

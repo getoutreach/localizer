@@ -1,0 +1,64 @@
+# Docs: https://docs.cortex.io/docs/reference/basics/entities#service-entities
+
+openapi: 3.0.0
+info:
+  title: localizer
+  description: >
+    A no-frills local development approach for Kubernetes powered Developer Environments.
+  x-cortex-type: service
+  x-cortex-slack:
+    channels:
+      - name: dev-tooling-design
+        notificationsEnabled: false
+      - name: dev-tooling-support
+        notificationsEnabled: false
+      - name: dt-oncall
+        notificationsEnabled: true
+      - name: fnd-dt-alerts
+        notificationsEnabled: true
+  x-cortex-owners:
+    - type: group
+      name: fnd-dt
+      provider: CORTEX
+  x-cortex-tag: localizer
+  x-cortex-git:
+    github:
+      repository: getoutreach/localizer
+  x-cortex-oncall:
+    pagerduty:
+      id: P9HJAUT
+      type: SERVICE
+  x-cortex-link:
+    ## These are useful documentation links for this service. Please fill in the customLinks block if you have additional documentation links.
+    ## name: The name of the link
+    ## type: Choose one type from (dashboard,documentation,healthcheck,logs,metrics,runbook)
+    ## url: The link url
+    ## description(optional): Description to this link
+    - name: API Docs
+      type: api_documentation
+      url: https://engdocs.outreach.cloud/github.com/getoutreach/localizer#section-readme
+    ## <<Stencil::Block(customLinks)>>
+    ## <</Stencil::Block>>
+  x-cortex-custom-metadata:
+    app: localizer
+    name: localizer
+    repo: https://github.com/getoutreach/localizer
+    framework: stencil
+    language: Golang
+    stencil_version: v1.38.0
+    golang_version: 1.22.0
+    cli: true
+    service: false
+    product: Outreach
+    lifecycle: in_development
+    ## <<Stencil::Block(extraAliases)>>
+    ## <</Stencil::Block>>
+    reporting_team: fnd-dt
+    lintroller: silver
+  x-cortex-groups:
+    - lifecycle: in_development
+    - product: Outreach
+    - language: Golang
+    - framework: stencil
+    - type: cli
+    - engOrg: fnd
