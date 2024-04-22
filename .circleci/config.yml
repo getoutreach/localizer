@@ -2,8 +2,8 @@
 # syntax, such as anchors, will be fixed automatically.
 version: 2.1
 orbs:
-  shared: getoutreach/shared@2.17.0
-  queue: eddiewebb/queue@1.8.4
+  shared: getoutreach/shared@2.26.2
+  queue: eddiewebb/queue@2.2.1
 
 parameters:
   rebuild_cache:
@@ -16,11 +16,11 @@ contexts: &contexts
   - ghaccesstoken
   - docker-registry
   - npm-credentials
-  - prismacloud-credentials
   - vault-dev
   - confluence
   - circleci-credentials
   - tray-webhooks
+  - wizcli
   ## <<Stencil::Block(extraContexts)>>
 
   ## <</Stencil::Block>>

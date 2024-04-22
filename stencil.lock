@@ -1,26 +1,26 @@
-version: v1.36.0
+version: v1.38.0
 modules:
     - name: github.com/getoutreach/devbase
       url: https://github.com/getoutreach/devbase
-      version: v2.17.0
+      version: v2.26.2
     - name: github.com/getoutreach/stencil-actions
       url: https://github.com/getoutreach/stencil-actions
-      version: v0.3.0
+      version: v0.4.0
     - name: github.com/getoutreach/stencil-base
       url: https://github.com/getoutreach/stencil-base
-      version: v0.12.0
+      version: v0.15.2
     - name: github.com/getoutreach/stencil-circleci
       url: https://github.com/getoutreach/stencil-circleci
-      version: v1.10.0
+      version: v1.12.1
     - name: github.com/getoutreach/stencil-discovery
       url: https://github.com/getoutreach/stencil-discovery
-      version: v1.8.0
+      version: v1.8.2
     - name: github.com/getoutreach/stencil-golang
       url: https://github.com/getoutreach/stencil-golang
-      version: v1.13.2
+      version: v1.22.0
     - name: github.com/getoutreach/stencil-outreach
       url: https://github.com/getoutreach/stencil-outreach
-      version: v0.12.2
+      version: v0.21.1
     - name: github.com/getoutreach/stencil-pipeline
       url: https://github.com/getoutreach/stencil-pipeline
       version: v1.1.0
@@ -79,30 +79,24 @@ files:
     - name: .vscode/settings.json
       template: .vscode/settings.json.tpl
       module: github.com/getoutreach/stencil-golang
-    - name: CONTRIBUTING.md
-      template: CONTRIBUTING.md.tpl
-      module: github.com/getoutreach/stencil-base
     - name: LICENSE
       template: LICENSE.tpl
       module: github.com/getoutreach/stencil-base
     - name: Makefile
       template: Makefile.tpl
       module: github.com/getoutreach/stencil-golang
-    - name: README.md
-      template: README.md.tpl
-      module: github.com/getoutreach/stencil-base
     - name: cmd/localizer/localizer.go
       template: cmd/main_cli.go.tpl
       module: github.com/getoutreach/stencil-golang
+    - name: cortex.yaml
+      template: cortex.yaml.tpl
+      module: github.com/getoutreach/stencil-outreach
     - name: devenv.yaml
       template: devenv.yaml.tpl
       module: github.com/getoutreach/stencil-golang
     - name: go.mod
       template: go.mod.tpl
       module: github.com/getoutreach/stencil-golang
-    - name: opslevel.yml
-      template: opslevel.yml.tpl
-      module: github.com/getoutreach/stencil-outreach
     - name: package.json
       template: package.json.tpl
       module: github.com/getoutreach/stencil-base
