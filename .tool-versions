@@ -5,7 +5,7 @@
 ## <<Stencil::Block(toolverOverride)>>
 ## <</Stencil::Block>>
 golang 1.22.0
-nodejs 18.17.1
+nodejs 20.12.2
 protoc 21.5
 terraform 1.5.7
 # Note: Versions in this block do not override the default versions above

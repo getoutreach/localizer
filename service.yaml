@@ -1,11 +1,11 @@
 name: localizer
 arguments:
-  commands:
-    - localizer:
-        delibird: true
   ciOptions:
     skipDocker: true
     skipE2e: true
+  commands:
+    - localizer:
+        delibird: true
   description: A no-frills local development approach for Kubernetes powered Developer Environments.
   grpcOptions:
     disableDocGeneration: true
@@ -23,8 +23,18 @@ arguments:
     - deploy/flagship-shared-secret/%(environment)s/authn-flagship-payload
 modules:
   - name: github.com/getoutreach/stencil-outreach
+    channel: rc
   - name: github.com/getoutreach/stencil-circleci
+    channel: rc
   - name: github.com/getoutreach/stencil-actions
+    channel: rc
   - name: github.com/getoutreach/stencil-discovery
+    channel: rc
   - name: github.com/getoutreach/stencil-base
+    channel: rc
   - name: github.com/getoutreach/stencil-golang
+    channel: rc
+  - name: github.com/getoutreach/devbase
+    channel: rc
+  - name: github.com/getoutreach/stencil-pipeline
+    channel: rc

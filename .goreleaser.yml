@@ -16,9 +16,9 @@ builds:
       - '-w -s -X "github.com/getoutreach/gobox/pkg/app.Version=v{{ .Version }}"'
     env:
       - CGO_ENABLED=0
-    ### <<Stencil::Block(localizerAdditionalEnv)>>
+      ## <<Stencil::Block(localizerAdditionalEnv)>>
 
-    ### <</Stencil::Block>>
+      ## <</Stencil::Block>>
 
 archives: []
 checksum:
