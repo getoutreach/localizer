@@ -1,29 +1,29 @@
-version: v1.38.1-rc.3
+version: v1.38.1
 modules:
     - name: github.com/getoutreach/devbase
       url: https://github.com/getoutreach/devbase
-      version: v2.27.0-rc.2
+      version: v2.27.0
     - name: github.com/getoutreach/stencil-actions
       url: https://github.com/getoutreach/stencil-actions
-      version: v0.4.1-rc.2
+      version: v0.4.1
     - name: github.com/getoutreach/stencil-base
       url: https://github.com/getoutreach/stencil-base
-      version: v0.16.0-rc.3
+      version: v0.16.0
     - name: github.com/getoutreach/stencil-circleci
       url: https://github.com/getoutreach/stencil-circleci
-      version: v1.13.0-rc.3
+      version: v1.13.0
     - name: github.com/getoutreach/stencil-discovery
       url: https://github.com/getoutreach/stencil-discovery
-      version: v1.8.3-rc.1
+      version: v1.8.3
     - name: github.com/getoutreach/stencil-golang
       url: https://github.com/getoutreach/stencil-golang
-      version: v1.23.0-rc.4
+      version: v1.23.0
     - name: github.com/getoutreach/stencil-outreach
       url: https://github.com/getoutreach/stencil-outreach
-      version: v0.22.0-rc.1
+      version: v0.22.0
     - name: github.com/getoutreach/stencil-pipeline
       url: https://github.com/getoutreach/stencil-pipeline
-      version: v1.2.0-rc.1
+      version: v1.2.0
 files:
     - name: .circleci/config.yml
       template: .circleci/config.yml.tpl

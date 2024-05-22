@@ -2,13 +2,16 @@
 # syntax, such as anchors, will be fixed automatically.
 version: 2.1
 orbs:
-  shared: getoutreach/shared@dev:2.27.0-rc.2
+  shared: getoutreach/shared@2.27.0
   queue: eddiewebb/queue@2.2.1
 
 parameters:
   rebuild_cache:
     type: boolean
     default: false
+  ## <<Stencil::Block(CircleCIExtraParams)>>
+
+  ## <</Stencil::Block>>
 
 # Extra contexts to expose to all jobs below
 contexts: &contexts
@@ -102,11 +105,11 @@ workflows:
       - shared/pre-release: &pre-release
           dryrun: true
           context: *contexts
-          ## <<Stencil::Block(circleReleaseExtra)>>
+          ## <<Stencil::Block(circlePreReleaseDryRunExtra)>>
 
           ## <</Stencil::Block>>
           requires:
-            ## <<Stencil::Block(circleReleaseRequires)>>
+            ## <<Stencil::Block(circlePreReleaseDryRunRequires)>>
 
             ## <</Stencil::Block>>
             - shared/test
