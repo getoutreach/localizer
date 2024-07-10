@@ -7,6 +7,8 @@ arguments:
     - localizer:
         delibird: true
   description: A no-frills local development approach for Kubernetes powered Developer Environments.
+  go:
+    stanza: "1.22"
   grpcOptions:
     disableDocGeneration: true
   lintroller: silver
