@@ -45,7 +45,7 @@ info:
     repo: https://github.com/getoutreach/localizer
     framework: stencil
     language: Golang
-    stencil_version: v1.38.1
+    stencil_version: v1.39.0-rc.1
     golang_version: 1.22.0
     cli: true
     service: false
@@ -56,9 +56,9 @@ info:
     reporting_team: fnd-dt
     lintroller: silver
   x-cortex-groups:
-    - lifecycle: in_development
-    - product: Outreach
-    - language: Golang
-    - framework: stencil
-    - type: cli
-    - engOrg: fnd
+    - lifecycle:in_development
+    - product:Outreach
+    - language:Golang
+    - framework:stencil
+    - type:cli
+    - engOrg:fnd
