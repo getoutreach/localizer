@@ -45,8 +45,8 @@ info:
     repo: https://github.com/getoutreach/localizer
     framework: stencil
     language: Golang
-    stencil_version: v1.39.0-rc.1
-    golang_version: 1.22.0
+    stencil_version: v1.39.1
+    golang_version: 1.22.6
     cli: true
     service: false
     product: Outreach
