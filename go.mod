@@ -179,5 +179,5 @@ replace (
 	// We're on a fork, keep version at v0.25.12
 	k8s.io/api => k8s.io/api v0.25.12
 	k8s.io/apimachinery => k8s.io/apimachinery v0.25.12
-	k8s.io/client-go => github.com/jaredallard/client-go v0.25.12-jaredallard.1
+	k8s.io/client-go => github.com/getoutreach/client-go v0.25.12-outreach.1
 )
