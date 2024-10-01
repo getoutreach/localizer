@@ -138,6 +138,8 @@ github.com/function61/gokit v0.0.0-20230712092143-d63a51667e64 h1:MaftAvlX7chRCD
 github.com/function61/gokit v0.0.0-20230712092143-d63a51667e64/go.mod h1:EsjrjWdM7Jt5k3txTdgSFDjWeoderMjwRWtXWJpwkg4=
 github.com/fynelabs/selfupdate v0.2.0 h1:IDqwgV7BYj4lCcoD8hHvIapVGmS5ifWrc0sQTWh1eFw=
 github.com/fynelabs/selfupdate v0.2.0/go.mod h1:rCdliRnLw+koUanA+lrqub9wWlNc2wPDTsyRC6A+vfc=
+github.com/getoutreach/client-go v0.25.12-outreach.1 h1:03p42I1mCT4krWepfY3cswTnEmCwBAzZAfHbY1UPX2Q=
+github.com/getoutreach/client-go v0.25.12-outreach.1/go.mod h1:WD2cp9N7NLyz2jMoq49vC6+8HKkjhqaDkk93l3eJO0M=
 github.com/getoutreach/gobox v1.90.2 h1:dRkIgououFs1rwrdT1pvD8OrHa9q6ufvKSYtsH2L2Kw=
 github.com/getoutreach/gobox v1.90.2/go.mod h1:xo3vkzGCj/Lp3KcfIWP9XT4rqFJjJT9cSWcOEiK1Lzk=
 github.com/gliderlabs/ssh v0.3.7 h1:iV3Bqi942d9huXnzEF2Mt+CY9gLu8DNM4Obd+8bODRE=
@@ -225,8 +227,6 @@ github.com/honeycombio/beeline-go v1.16.0 h1:hJjxbsq6szrv5bGrrRuIg2ayHwJhEKPX/h6
 github.com/honeycombio/beeline-go v1.16.0/go.mod h1:zYW9IRowl76PocAe0A8rU35EChJlT1AafAwCQ1pPEkI=
 github.com/imdario/mergo v0.3.15 h1:M8XP7IuFNsqUx6VPK2P9OSmsYsI/YFaGil0uD21V3dM=
 github.com/imdario/mergo v0.3.15/go.mod h1:WBLT9ZmE3lPoWsEzCh9LPo3TiwVN+ZKEjmz+hD27ysY=
-github.com/jaredallard/client-go v0.25.12-jaredallard.1 h1:/3IB+IDCHh0jhkhYsIN4bouy28PdPcXTA+yeYOlPieU=
-github.com/jaredallard/client-go v0.25.12-jaredallard.1/go.mod h1:WD2cp9N7NLyz2jMoq49vC6+8HKkjhqaDkk93l3eJO0M=
 github.com/jbenet/go-context v0.0.0-20150711004518-d14ea06fba99 h1:BQSFePA1RWJOlocH6Fxy8MmwDt+yVQYULKfN0RoTN8A=
 github.com/jbenet/go-context v0.0.0-20150711004518-d14ea06fba99/go.mod h1:1lJo3i6rXxKeerYnT8Nvf0QmHCRC1n8sfWVwXF2Frvo=
 github.com/jmoiron/sqlx v1.3.5 h1:vFFPA71p1o5gAeqtEAwLU4dnX2napprKtHr7PYIcN3g=
