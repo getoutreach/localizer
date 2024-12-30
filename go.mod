@@ -29,7 +29,7 @@ require (
 
 require (
 	github.com/egymgmbh/go-prefix-writer v0.0.0-20180609083313-7326ea162eca
-	github.com/fatih/color v1.17.0
+	github.com/fatih/color v1.18.0
 	github.com/getoutreach/gobox v1.90.2
 )
 
