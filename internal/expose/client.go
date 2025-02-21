@@ -138,8 +138,9 @@ type patchUInt32Value struct {
 // scaleObject attempts to scale a given object in appsv1
 func (c *Client) scaleObject(ctx context.Context, scaledObj scaledObjectType, replicas int) error {
 	payload := []patchUInt32Value{{
-		Op:    "replace",
-		Path:  "/spec/replicas",
+		Op:   "replace",
+		Path: "/spec/replicas",
+		// nolint: gosec // Why: replicas is never negative
 		Value: uint(replicas),
 	}}
 	payloadBytes, err := json.Marshal(payload)

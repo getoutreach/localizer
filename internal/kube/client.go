@@ -117,6 +117,7 @@ func ResolveServicePorts(log logrus.FieldLogger, s *corev1.Service) ([]ResolvedS
 			servicePorts[i] = ResolvedServicePort{
 				sp,
 				"",
+				// nolint: gosec // Why: ports are never negative
 				uint(sp.Port),
 			}
 		}
@@ -153,6 +154,7 @@ func ResolveServicePorts(log logrus.FieldLogger, s *corev1.Service) ([]ResolvedS
 		servicePorts[i] = ResolvedServicePort{
 			p,
 			original,
+			// nolint: gosec // Why: ports are never negative
 			uint(p.TargetPort.IntValue()),
 		}
 	}
@@ -300,6 +302,7 @@ func ResolveServicePortsFromControllers(log logrus.FieldLogger, s *corev1.Servic
 		resolvedPorts[i] = ResolvedServicePort{
 			p,
 			original,
+			// nolint: gosec // Why: ports are never negative
 			uint(p.TargetPort.IntValue()),
 		}
 	}

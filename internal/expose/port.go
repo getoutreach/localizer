@@ -98,10 +98,9 @@ func (p *ServiceForward) createServerPod(ctx context.Context) (func(), *corev1.P
 	// map the service ports into containerPorts, using the
 	containerPorts := make([]corev1.ContainerPort, len(p.Ports))
 	for i, port := range p.Ports {
-		portInt := int(port.TargetPort.IntVal)
 		name := port.OriginalTargetPort
 		cp := corev1.ContainerPort{
-			ContainerPort: int32(portInt),
+			ContainerPort: port.TargetPort.IntVal,
 			Name:          name,
 			Protocol:      corev1.ProtocolTCP,
 		}
