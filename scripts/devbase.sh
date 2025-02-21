@@ -6,7 +6,7 @@ DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 libDir="$DIR/../.bootstrap"
 lockfile="$DIR/../stencil.lock"
 serviceYaml="$DIR/../service.yaml"
-gojqVersion="v0.12.14"
+gojqVersion="v0.12.16"
 
 # get_absolute_path returns the absolute path of a file
 get_absolute_path() {

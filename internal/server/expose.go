@@ -54,6 +54,7 @@ func mapPorts(portMap []string, log logrus.FieldLogger, servicePorts []kube.Reso
 		// TODO(jaredallard): this is slow...
 		for i, sp := range servicePorts {
 			log.Debugf("checking if we need to map %s, using %d:%d", sp.TargetPort.String(), rem, local)
+			// nolint: gosec // Why: ports are never negative
 			if uint(servicePorts[i].TargetPort.IntValue()) == uint(rem) {
 				log.Debugf("mapping remote port %d -> %d locally", rem, local)
 				servicePorts[i].MappedPort = uint(local)

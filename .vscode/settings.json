@@ -12,6 +12,11 @@
   "go.alternateTools": {
     "golangci-lint": "${workspaceFolder}/.bootstrap/shell/vscode/golang-linters.sh"
   },
+  // This is disabled because it causes version mismatches between the
+  // tools used/installed by asdf / stencil, and the ones updated by VSCode.
+  // In particular, this is a problem with newer versions of golangci-lint
+  // incompatible with older versions of Go.
+  "go.toolsManagement.autoUpdate": false,
   "go.buildTags": "or_dev",
   "go.testTags": "or_test,or_int,or_e2e",
   "files.trimTrailingWhitespace": true,

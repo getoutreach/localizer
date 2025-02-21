@@ -85,6 +85,7 @@ func NewReverseTunnelClient(l logrus.FieldLogger, host string, port int, ports [
 			remotePort = rport
 		}
 
+		// nolint: gosec // Why: port numbers are never negative.
 		portMap[uint(remotePort)] = uint(localPort)
 	}
 	return &Client{l, host, port, portMap}
