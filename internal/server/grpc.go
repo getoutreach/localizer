@@ -69,6 +69,7 @@ func (g *GRPCService) CleanupPreviousInstance(ctx context.Context, log logrus.Fi
 	defer cancel()
 
 	log.Info("checking if an instance of localizer is already running")
+	// nolint: staticcheck // Why: we are not upgrading to the new grpc API yet.
 	client, closer, err := localizer.Connect(ctx, grpc.WithBlock(), grpc.WithTransportCredentials(insecure.NewCredentials()))
 
 	// if we made a connection, see if it's responding to pings
