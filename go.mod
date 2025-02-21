@@ -7,7 +7,7 @@ toolchain go1.23.4
 require (
 	github.com/asaskevich/govalidator v0.0.0-20230301143203-a9d515a09cc2
 	github.com/benbjohnson/clock v1.3.5
-	github.com/davecgh/go-spew v1.1.1
+	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
 	github.com/function61/gokit v0.0.0-20230712092143-d63a51667e64
 	github.com/google/go-cmp v0.6.0
 	github.com/google/gofuzz v1.2.0 // indirect
@@ -30,7 +30,7 @@ require (
 require (
 	github.com/egymgmbh/go-prefix-writer v0.0.0-20180609083313-7326ea162eca
 	github.com/fatih/color v1.18.0
-	github.com/getoutreach/gobox v1.102.0
+	github.com/getoutreach/gobox v1.103.1
 )
 
 require (
