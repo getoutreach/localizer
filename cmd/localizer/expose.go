@@ -65,6 +65,7 @@ func NewExposeCommand(log logrus.FieldLogger) *cli.Command {
 
 			log.Info("connecting to localizer daemon")
 
+			// nolint: staticcheck // Why: we are not upgrading to the new grpc API yet.
 			client, closer, err := localizer.Connect(ctx, grpc.WithBlock(), grpc.WithTransportCredentials(insecure.NewCredentials()))
 			if err != nil {
 				return errors.Wrap(err, "failed to connect to localizer daemon")

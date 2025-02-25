@@ -33,6 +33,7 @@ func IsRunning() bool {
 // connection (returned from grpc.Dial*).
 func Connect(ctx context.Context, opts ...grpc.DialOption) (client api.LocalizerServiceClient,
 	closer func(), err error) {
+	// nolint: staticcheck // Why: we are not upgrading to the new grpc API yet.
 	clientConn, err := grpc.DialContext(ctx, fmt.Sprintf("unix://%s", Socket), opts...)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "dial localizer")
