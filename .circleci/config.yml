@@ -2,7 +2,7 @@
 # syntax, such as anchors, will be fixed automatically.
 version: 2.1
 orbs:
-  shared: getoutreach/shared@2.29.0
+  shared: getoutreach/shared@dev:2.31.0-rc.3
   queue: eddiewebb/queue@2.2.1
   ## <<Stencil::Block(CircleCIExtraOrbs)>>
 
