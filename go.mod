@@ -33,14 +33,7 @@ require (
 )
 
 require (
-	cloud.google.com/go/compute/metadata v0.6.0 // indirect
 	dario.cat/mergo v1.0.1 // indirect
-	github.com/Azure/go-autorest v14.2.0+incompatible // indirect
-	github.com/Azure/go-autorest/autorest v0.11.27 // indirect
-	github.com/Azure/go-autorest/autorest/adal v0.9.20 // indirect
-	github.com/Azure/go-autorest/autorest/date v0.3.0 // indirect
-	github.com/Azure/go-autorest/logger v0.2.1 // indirect
-	github.com/Azure/go-autorest/tracing v0.6.0 // indirect
 	github.com/Microsoft/go-winio v0.6.2 // indirect
 	github.com/ProtonMail/go-crypto v1.1.6 // indirect
 	github.com/alecthomas/chroma/v2 v2.14.0 // indirect
@@ -70,6 +63,7 @@ require (
 	github.com/emicklei/go-restful/v3 v3.11.0 // indirect
 	github.com/emirpasic/gods v1.18.1 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
+	github.com/fxamacker/cbor/v2 v2.7.0 // indirect
 	github.com/fynelabs/selfupdate v0.2.0 // indirect
 	github.com/go-git/gcfg v1.5.1-0.20230307220236-3a3c6141e376 // indirect
 	github.com/go-git/go-billy/v5 v5.6.2 // indirect
@@ -83,12 +77,12 @@ require (
 	github.com/golang/groupcache v0.0.0-20241129210726-2c02b8208cf8 // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/golang/snappy v0.0.4 // indirect
-	github.com/google/gnostic v0.5.7-v3refs // indirect
 	github.com/google/gnostic-models v0.6.8 // indirect
 	github.com/google/go-github/v71 v71.0.0 // indirect
 	github.com/google/go-querystring v1.1.0 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/gorilla/css v1.0.1 // indirect
+	github.com/gorilla/websocket v1.5.0 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.26.1 // indirect
 	github.com/honeycombio/beeline-go v1.19.0 // indirect
 	github.com/imdario/mergo v0.3.15 // indirect
@@ -106,13 +100,14 @@ require (
 	github.com/mattn/go-runewidth v0.0.16 // indirect
 	github.com/microcosm-cc/bluemonday v1.0.27 // indirect
 	github.com/mitchellh/colorstring v0.0.0-20190213212951-d06e56a500db // indirect
-	github.com/moby/spdystream v0.2.0 // indirect
+	github.com/moby/spdystream v0.4.0 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/montanaflynn/stats v0.7.1 // indirect
 	github.com/muesli/reflow v0.3.0 // indirect
 	github.com/muesli/termenv v0.16.0 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
+	github.com/mxk/go-flowrate v0.0.0-20140419014527-cca7078d478f // indirect
 	github.com/pjbgf/sha1cd v0.3.2 // indirect
 	github.com/prometheus/client_golang v1.22.0 // indirect
 	github.com/prometheus/client_model v0.6.2 // indirect
@@ -127,6 +122,7 @@ require (
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/ulikunitz/xz v0.5.12 // indirect
 	github.com/urfave/cli/v3 v3.3.3 // indirect
+	github.com/x448/float16 v0.8.4 // indirect
 	github.com/xanzy/ssh-agent v0.3.3 // indirect
 	github.com/xdg-go/pbkdf2 v1.0.0 // indirect
 	github.com/xdg-go/scram v1.1.2 // indirect
@@ -171,17 +167,9 @@ require (
 require (
 	github.com/Masterminds/semver/v3 v3.3.1 // indirect
 	github.com/bombsimon/logrusr/v2 v2.0.1
-	github.com/golang-jwt/jwt/v4 v4.5.2 // indirect
 	github.com/lib/pq v1.10.9 // indirect
 	golang.org/x/time v0.3.0 // indirect
 	k8s.io/utils v0.0.0-20240711033017-18e509b52bc8 // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.4.1 // indirect
 	sigs.k8s.io/yaml v1.4.0 // indirect
-)
-
-replace (
-	// We're on a fork, keep version at v0.25.12
-	k8s.io/api => k8s.io/api v0.25.12
-	k8s.io/apimachinery => k8s.io/apimachinery v0.25.12
-	k8s.io/client-go => github.com/getoutreach/client-go v0.25.12-outreach.1
 )
