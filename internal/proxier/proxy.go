@@ -23,6 +23,7 @@ import (
 
 	"github.com/getoutreach/localizer/internal/kevents"
 	"github.com/getoutreach/localizer/internal/kube"
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -97,7 +98,7 @@ func NewProxier(ctx context.Context, k kubernetes.Interface, kconf *rest.Config,
 		endpointsInformer: endpointsInformer,
 	}
 
-	svcInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
+	if _, err := svcInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			key, err := cache.MetaNamespaceKeyFunc(obj)
 			if err == nil {
@@ -116,16 +117,21 @@ func NewProxier(ctx context.Context, k kubernetes.Interface, kconf *rest.Config,
 				p.queue.Add(key)
 			}
 		},
-	})
+	}); err != nil {
+		return nil, errors.Wrap(err, "failed to add service event handlers")
+	}
 
-	endpointsInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
+	if _, err := endpointsInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		UpdateFunc: func(oldObj, obj interface{}) {
 			key, err := cache.MetaNamespaceKeyFunc(obj)
 			if err == nil {
 				p.queue.Add(key)
 			}
 		},
-	})
+	}); err != nil {
+		return nil, errors.Wrap(err, "failed to add endpoints event handlers")
+	}
+
 	return p, nil
 }
 
