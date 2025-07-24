@@ -21,7 +21,7 @@
 		"scope": "go",
 		"prefix": "copyright",
 		"body": [
-			"// Copyright ${CURRENT_YEAR} Outreach Corporation. All Rights Reserved.\n",
+			"// Copyright ${CURRENT_YEAR} Outreach Corporation. Licensed under the Apache License 2.0.\n",
 			"// Description: $0"
 		],
 		"description": "Outreach Copyright and Description"

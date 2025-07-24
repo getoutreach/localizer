@@ -1,29 +1,29 @@
-version: v1.42.0-rc.2
+version: v1.43.0-rc.5
 modules:
     - name: github.com/getoutreach/devbase
       url: https://github.com/getoutreach/devbase
-      version: v2.32.0
+      version: v2.33.0-rc.9
     - name: github.com/getoutreach/stencil-actions
       url: https://github.com/getoutreach/stencil-actions
-      version: v0.4.6-rc.1
+      version: v0.4.6
     - name: github.com/getoutreach/stencil-base
       url: https://github.com/getoutreach/stencil-base
-      version: v0.16.5-rc.2
+      version: v0.17.0-rc.1
     - name: github.com/getoutreach/stencil-circleci
       url: https://github.com/getoutreach/stencil-circleci
-      version: v1.16.1-rc.1
+      version: v1.16.2-rc.2
     - name: github.com/getoutreach/stencil-discovery
       url: https://github.com/getoutreach/stencil-discovery
-      version: v1.8.9-rc.1
+      version: v1.8.9
     - name: github.com/getoutreach/stencil-golang
       url: https://github.com/getoutreach/stencil-golang
-      version: v1.27.0-rc.1
+      version: v1.28.0-rc.2
     - name: github.com/getoutreach/stencil-outreach
       url: https://github.com/getoutreach/stencil-outreach
-      version: v0.26.1-rc.1
+      version: v0.26.2-rc.2
     - name: github.com/getoutreach/stencil-pipeline
       url: https://github.com/getoutreach/stencil-pipeline
-      version: v1.2.6-rc.1
+      version: v1.2.6
 files:
     - name: .circleci/config.yml
       template: .circleci/config.yml.tpl
@@ -97,6 +97,9 @@ files:
     - name: go.mod
       template: go.mod.tpl
       module: github.com/getoutreach/stencil-golang
+    - name: mise.toml
+      template: mise.toml.tpl
+      module: github.com/getoutreach/stencil-base
     - name: package.json
       template: package.json.tpl
       module: github.com/getoutreach/stencil-base
