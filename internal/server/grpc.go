@@ -1,4 +1,4 @@
-// Copyright 2022 Outreach Corporation. All Rights Reserved.
+// Copyright 2022 Outreach Corporation. Licensed under the Apache License 2.0.
 // Copyright 2020 Jared Allard
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
