@@ -22,7 +22,7 @@ import (
 	"github.com/getoutreach/localizer/internal/server"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 	"k8s.io/klog/v2"
 
 	// Place any extra imports for your startup code here
@@ -44,11 +44,11 @@ func main() {
 
 	// <</Stencil::Block>>
 
-	app := cli.App{
-		Version: oapp.Version,
-		Name:    "localizer",
+	app := cli.Command{
+		Version:               oapp.Version,
+		Name:                  "localizer",
+		EnableShellCompletion: true,
 		// <<Stencil::Block(app)>>
-		EnableBashCompletion: true,
 		// <</Stencil::Block>>
 	}
 	app.Flags = []cli.Flag{
@@ -58,17 +58,17 @@ func main() {
 		&cli.StringFlag{
 			Name:    "context",
 			Usage:   "Specify Kubernetes context to use",
-			EnvVars: []string{"KUBECONTEXT"},
+			Sources: cli.EnvVars("KUBECONTEXT"),
 		},
 		&cli.StringFlag{
 			Name:    "log-level",
 			Usage:   "Set the log level. Valid values are: debug",
-			EnvVars: []string{"LOG_LEVEL"},
+			Sources: cli.EnvVars("LOG_LEVEL"),
 		},
 		&cli.StringFlag{
 			Name:        "log-format",
 			Usage:       "Set the log format",
-			EnvVars:     []string{"LOG_FORMAT"},
+			Sources:     cli.EnvVars("LOG_FORMAT"),
 			DefaultText: "TEXT",
 		},
 		&cli.StringFlag{
@@ -103,7 +103,7 @@ func main() {
 		ForceColors: true,
 	}
 
-	app.Before = func(c *cli.Context) error {
+	app.Before = func(ctx context.Context, c *cli.Command) (context.Context, error) {
 		// Automatic updater is currently disabled
 		// until consumers have time to pass in
 		// --skip-update if required.
@@ -130,15 +130,15 @@ func main() {
 		// setup the global kubernetes cache interface
 		config, k, err := kube.GetKubeClient(c.String("context"))
 		if err != nil {
-			return err
+			return ctx, err
 		}
 		log.Infof("using apiserver %s", config.Host)
 		kevents.ConfigureGlobalCache(k, c.String("namespace"))
 
-		return nil
+		return ctx, nil
 	}
 
-	app.Action = func(c *cli.Context) error {
+	app.Action = func(ctx context.Context, c *cli.Command) error {
 		u, err := user.Current()
 		if err != nil {
 			return errors.Wrap(err, "failed to get current user")
@@ -164,7 +164,7 @@ func main() {
 	// <</Stencil::Block>>
 
 	// Insert global flags, tracing, updating and start the application.
-	gcli.Run(ctx, cancel, &app, &gcli.Config{
+	gcli.RunV3(ctx, cancel, &app, &gcli.Config{
 		Logger: log,
 		Telemetry: gcli.TelemetryConfig{
 			UseDelibird: true,

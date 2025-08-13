@@ -17,7 +17,7 @@ require (
 	github.com/metal-stack/go-ipam v1.13.0
 	github.com/pkg/errors v0.9.1
 	github.com/sirupsen/logrus v1.9.3
-	github.com/urfave/cli/v2 v2.27.6
+	github.com/urfave/cli/v2 v2.27.6 // indirect
 	golang.org/x/crypto v0.40.0
 	google.golang.org/grpc v1.74.2
 	google.golang.org/protobuf v1.36.6
@@ -122,7 +122,7 @@ require (
 	github.com/skeema/knownhosts v1.3.1 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/ulikunitz/xz v0.5.12 // indirect
-	github.com/urfave/cli/v3 v3.3.3 // indirect
+	github.com/urfave/cli/v3 v3.3.3
 	github.com/x448/float16 v0.8.4 // indirect
 	github.com/xanzy/ssh-agent v0.3.3 // indirect
 	github.com/xdg-go/pbkdf2 v1.0.0 // indirect
