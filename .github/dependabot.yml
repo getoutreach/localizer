@@ -14,6 +14,9 @@ updates:
       - dependency-name: github.com/getoutreach/services
       - dependency-name: github.com/getoutreach/datastores/v2
       - dependency-name: github.com/getoutreach/httpx
+      ## <<Stencil::Block(dependabotGoIgnore)>>
+
+      ## <</Stencil::Block>>
 
   # Ignore semantic-release, this code is only executed in CI.
   - package-ecosystem: "npm"

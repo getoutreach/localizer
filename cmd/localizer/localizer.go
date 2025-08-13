@@ -1,4 +1,4 @@
-// Copyright 2025 Outreach Corporation. All Rights Reserved.
+// Copyright 2025 Outreach Corporation. Licensed under the Apache License 2.0.
 
 // Description: This file is the entrypoint for the localizer CLI
 // command for localizer.
