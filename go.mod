@@ -20,7 +20,7 @@ require (
 	github.com/urfave/cli/v2 v2.27.6 // indirect
 	golang.org/x/crypto v0.40.0
 	google.golang.org/grpc v1.74.2
-	google.golang.org/protobuf v1.36.6
+	google.golang.org/protobuf v1.36.7
 
 	// kubernetes deps
 	k8s.io/api v0.30.0
