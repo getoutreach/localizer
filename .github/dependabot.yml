@@ -9,11 +9,14 @@ updates:
     ignore:
       - dependency-name: github.com/getoutreach/gobox
       - dependency-name: github.com/getoutreach/stencil-golang/pkg
-      - dependency-name: github.com/urfave/cli/v2
+      - dependency-name: github.com/urfave/cli/v3
       - dependency-name: github.com/getoutreach/mint
       - dependency-name: github.com/getoutreach/services
       - dependency-name: github.com/getoutreach/datastores/v2
       - dependency-name: github.com/getoutreach/httpx
+      ## <<Stencil::Block(dependabotGoIgnore)>>
+
+      ## <</Stencil::Block>>
 
   # Ignore semantic-release, this code is only executed in CI.
   - package-ecosystem: "npm"

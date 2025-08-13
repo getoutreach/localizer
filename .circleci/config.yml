@@ -2,7 +2,7 @@
 # syntax, such as anchors, will be fixed automatically.
 version: 2.1
 orbs:
-  shared: getoutreach/shared@2.32.0
+  shared: getoutreach/shared@dev:2.33.0-rc.13
   queue: eddiewebb/queue@2.2.1
   ## <<Stencil::Block(CircleCIExtraOrbs)>>
 
@@ -60,7 +60,6 @@ jobs:
   ### End jobs inserted by other modules
 
 workflows:
-  version: 2
   ## <<Stencil::Block(circleWorkflows)>>
 
   ## <</Stencil::Block>>

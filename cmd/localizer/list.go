@@ -1,4 +1,4 @@
-// Copyright 2022 Outreach Corporation. All Rights Reserved.
+// Copyright 2022 Outreach Corporation. Licensed under the Apache License 2.0.
 // Copyright 2020 Jared Allard
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
@@ -29,7 +29,7 @@ import (
 	"github.com/getoutreach/localizer/pkg/localizer"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
@@ -39,12 +39,12 @@ func NewListCommand(_ logrus.FieldLogger) *cli.Command {
 		Name:        "list",
 		Description: "list all port-forwarded services and their status(es)",
 		Usage:       "list",
-		Action: func(c *cli.Context) error {
+		Action: func(ctx context.Context, c *cli.Command) error {
 			if !localizer.IsRunning() {
 				return fmt.Errorf("localizer daemon not running (run localizer by itself?)")
 			}
 
-			ctx, cancel := context.WithTimeout(c.Context, 30*time.Second)
+			ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 			defer cancel()
 
 			// nolint: staticcheck // Why: we are not upgrading to the new grpc API yet.
