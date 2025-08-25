@@ -32,6 +32,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/tools/portforward"
+	"k8s.io/utils/ptr"
 )
 
 const (
@@ -140,22 +141,12 @@ func (p *ServiceForward) createServerPod(ctx context.Context) (func(), *corev1.P
 					ImagePullPolicy: corev1.PullIfNotPresent,
 					Ports:           containerPorts,
 					Env: []corev1.EnvVar{
-						{
-							Name:  "PASSWORD_ACCESS",
-							Value: "true",
-						},
-						{
-							Name:  "USER_PASSWORD",
-							Value: "supersecretpassword",
-						},
-						{
-							Name:  "USER_NAME",
-							Value: "outreach",
-						},
-						{
-							Name:  "DOCKER_MODS",
-							Value: "linuxserver/mods:openssh-server-ssh-tunnel",
-						},
+						{Name: "PUID", Value: "1000"},
+						{Name: "PGID", Value: "1000"},
+						{Name: "PASSWORD_ACCESS", Value: "true"},
+						{Name: "USER_PASSWORD", Value: "supersecretpassword"},
+						{Name: "USER_NAME", Value: "outreach"},
+						{Name: "DOCKER_MODS", Value: "linuxserver/mods:openssh-server-ssh-tunnel"},
 					},
 					ReadinessProbe: &corev1.Probe{
 						ProbeHandler: corev1.ProbeHandler{
@@ -174,7 +165,30 @@ func (p *ServiceForward) createServerPod(ctx context.Context) (func(), *corev1.P
 							corev1.ResourceMemory: resource.MustParse("100Mi"),
 						},
 					},
+					SecurityContext: &corev1.SecurityContext{
+						AllowPrivilegeEscalation: ptr.To(false),
+						Capabilities: &corev1.Capabilities{
+							Add:  []corev1.Capability{"CHOWN", "SETGID", "SETUID"},
+							Drop: []corev1.Capability{"ALL"},
+						},
+					},
+					VolumeMounts: []corev1.VolumeMount{
+						{Name: "app", MountPath: "/app"},
+						{Name: "config", MountPath: "/config"},
+						{Name: "defaults", MountPath: "/defaults"},
+					},
 				},
+			},
+			SecurityContext: &corev1.PodSecurityContext{
+				SeccompProfile: &corev1.SeccompProfile{
+					Type: corev1.SeccompProfileTypeRuntimeDefault,
+				},
+				FSGroup: ptr.To(int64(1000)),
+			},
+			Volumes: []corev1.Volume{
+				{Name: "app", VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}}},
+				{Name: "config", VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}}},
+				{Name: "defaults", VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}}},
 			},
 		},
 	}
