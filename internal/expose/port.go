@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
@@ -38,6 +39,12 @@ import (
 const (
 	ExposedPodLabel = "localizer.jaredallard.github.com/exposed"
 	ObjectsPodLabel = "localizer.jaredallard.github.com/objects"
+
+	// PodGID is the GID to use for the SSH pod's user
+	PodGID = 1000
+
+	// PodUID is the UID to use for the SSH pod's user
+	PodUID = 1000
 )
 
 var (
@@ -141,8 +148,8 @@ func (p *ServiceForward) createServerPod(ctx context.Context) (func(), *corev1.P
 					ImagePullPolicy: corev1.PullIfNotPresent,
 					Ports:           containerPorts,
 					Env: []corev1.EnvVar{
-						{Name: "PUID", Value: "1000"},
-						{Name: "PGID", Value: "1000"},
+						{Name: "PUID", Value: strconv.Itoa(PodUID)},
+						{Name: "PGID", Value: strconv.Itoa(PodGID)},
 						{Name: "PASSWORD_ACCESS", Value: "true"},
 						{Name: "USER_PASSWORD", Value: "supersecretpassword"},
 						{Name: "USER_NAME", Value: "outreach"},
@@ -183,7 +190,7 @@ func (p *ServiceForward) createServerPod(ctx context.Context) (func(), *corev1.P
 				SeccompProfile: &corev1.SeccompProfile{
 					Type: corev1.SeccompProfileTypeRuntimeDefault,
 				},
-				FSGroup: ptr.To(int64(1000)),
+				FSGroup: ptr.To(int64(PodGID)),
 			},
 			Volumes: []corev1.Volume{
 				{Name: "app", VolumeSource: corev1.VolumeSource{EmptyDir: &corev1.EmptyDirVolumeSource{}}},
