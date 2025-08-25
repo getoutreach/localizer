@@ -40,10 +40,10 @@ const (
 	ExposedPodLabel = "localizer.jaredallard.github.com/exposed"
 	ObjectsPodLabel = "localizer.jaredallard.github.com/objects"
 
-	// PodGID is the GID to use for the SSH pod's user
+	// PodGID is the group ID to use for the SSH pod's user.
 	PodGID = 1000
 
-	// PodUID is the UID to use for the SSH pod's user
+	// PodUID is the user ID to use for the SSH pod's user.
 	PodUID = 1000
 )
 
