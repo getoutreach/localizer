@@ -5,7 +5,8 @@ orbs:
   shared: getoutreach/shared@dev:2.33.0-rc.13
   queue: eddiewebb/queue@2.2.1
   ## <<Stencil::Block(CircleCIExtraOrbs)>>
-
+environment:
+  ALLOW_MISE_TO_MANAGE_TOOL_VERSIONS: true
   ## <</Stencil::Block>>
 
 parameters:
@@ -40,8 +41,8 @@ test: &test
   ### End parameters inserted by other modules
   ## <<Stencil::Block(circleTestExtra)>>
   executor_name: testbed-docker
-  docker_image: golang
-  docker_tag: 1.23.4
+  docker_image: ubuntu
+  docker_tag: "24.04"
   ## <</Stencil::Block>>
 
 # Branches used for releasing code, pre-release or not
@@ -128,7 +129,6 @@ workflows:
       - shared/test:
           <<: *test
           ## <<Stencil::Block(circleSharedTestExtra)>>
-
           ## <</Stencil::Block>>
       - shared/publish_docs:
           context: *contexts
