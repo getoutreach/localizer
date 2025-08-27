@@ -39,6 +39,7 @@ test: &test
   ### Start parameters inserted by other modules
   ### End parameters inserted by other modules
   ## <<Stencil::Block(circleTestExtra)>>
+  executor_name: testbed-docker
   docker_image: golang
   docker_tag: 1.23.4
   ## <</Stencil::Block>>
