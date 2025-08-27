@@ -39,7 +39,8 @@ test: &test
   ### Start parameters inserted by other modules
   ### End parameters inserted by other modules
   ## <<Stencil::Block(circleTestExtra)>>
-
+  docker_image: golang
+  docker_tag: 1.23.4
   ## <</Stencil::Block>>
 
 # Branches used for releasing code, pre-release or not
