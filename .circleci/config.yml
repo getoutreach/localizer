@@ -116,7 +116,9 @@ workflows:
           dryrun: true
           context: *contexts
           ## <<Stencil::Block(circlePreReleaseDryRunExtra)>>
-
+          executor_name: testbed-docker
+          docker_image: ghcr.io/getoutreach/bootstrap/ci-oss
+          docker_tag: latest
           ## <</Stencil::Block>>
           requires:
             ## <<Stencil::Block(circlePreReleaseDryRunRequires)>>
