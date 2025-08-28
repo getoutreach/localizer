@@ -5,7 +5,8 @@ orbs:
   shared: getoutreach/shared@dev:2.33.0-rc.13
   queue: eddiewebb/queue@2.2.1
   ## <<Stencil::Block(CircleCIExtraOrbs)>>
-
+environment:
+  ALLOW_MISE_TO_MANAGE_TOOL_VERSIONS: true
   ## <</Stencil::Block>>
 
 parameters:
@@ -39,7 +40,9 @@ test: &test
   ### Start parameters inserted by other modules
   ### End parameters inserted by other modules
   ## <<Stencil::Block(circleTestExtra)>>
-
+  executor_name: testbed-docker
+  docker_image: ghcr.io/getoutreach/bootstrap/ci-oss
+  docker_tag: latest
   ## <</Stencil::Block>>
 
 # Branches used for releasing code, pre-release or not
@@ -113,7 +116,9 @@ workflows:
           dryrun: true
           context: *contexts
           ## <<Stencil::Block(circlePreReleaseDryRunExtra)>>
-
+          executor_name: testbed-docker
+          docker_image: ghcr.io/getoutreach/bootstrap/ci-oss
+          docker_tag: latest
           ## <</Stencil::Block>>
           requires:
             ## <<Stencil::Block(circlePreReleaseDryRunRequires)>>
@@ -126,7 +131,6 @@ workflows:
       - shared/test:
           <<: *test
           ## <<Stencil::Block(circleSharedTestExtra)>>
-
           ## <</Stencil::Block>>
       - shared/publish_docs:
           context: *contexts
