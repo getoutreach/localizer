@@ -41,8 +41,8 @@ test: &test
   ### End parameters inserted by other modules
   ## <<Stencil::Block(circleTestExtra)>>
   executor_name: testbed-docker
-  docker_image: ubuntu
-  docker_tag: "24.04"
+  docker_image: ghcr.io/getoutreach/bootstrap/ci-oss
+  docker_tag: latest
   ## <</Stencil::Block>>
 
 # Branches used for releasing code, pre-release or not
