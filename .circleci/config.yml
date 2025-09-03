@@ -114,7 +114,7 @@ workflows:
           context: *contexts
           executor_name: oss-docker
           ## <<Stencil::Block(circlePreReleaseDryRunExtra)>>
-
+          docker_tag: latest
           ## <</Stencil::Block>>
           requires:
             ## <<Stencil::Block(circlePreReleaseDryRunRequires)>>
@@ -128,7 +128,7 @@ workflows:
           <<: *test
           executor_name: oss-docker
           ## <<Stencil::Block(circleSharedTestExtra)>>
-
+          docker_tag: latest
           ## <</Stencil::Block>>
       - shared/publish_docs:
           context: *contexts
