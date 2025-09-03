@@ -49,6 +49,7 @@ func main() {
 		Name:                  "localizer",
 		EnableShellCompletion: true,
 		// <<Stencil::Block(app)>>
+
 		// <</Stencil::Block>>
 	}
 	app.Flags = []cli.Flag{
