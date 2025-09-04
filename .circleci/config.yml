@@ -5,8 +5,7 @@ orbs:
   shared: getoutreach/shared@dev:2.33.0-rc.18
   queue: eddiewebb/queue@2.2.1
   ## <<Stencil::Block(CircleCIExtraOrbs)>>
-environment:
-  ALLOW_MISE_TO_MANAGE_TOOL_VERSIONS: true
+
   ## <</Stencil::Block>>
 
 parameters:
@@ -131,6 +130,7 @@ workflows:
           executor_name: oss-docker
           docker_image: ghcr.io/getoutreach/bootstrap/ci-oss
           ## <<Stencil::Block(circleSharedTestExtra)>>
+
           ## <</Stencil::Block>>
       - shared/publish_docs:
           context: *contexts
