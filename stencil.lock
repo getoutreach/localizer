@@ -2,7 +2,7 @@ version: v1.43.0-rc.8
 modules:
     - name: github.com/getoutreach/devbase
       url: https://github.com/getoutreach/devbase
-      version: malept/fix/forked-prs-support
+      version: v2.33.0-rc.18
     - name: github.com/getoutreach/stencil-actions
       url: https://github.com/getoutreach/stencil-actions
       version: v0.4.7-rc.1
@@ -11,7 +11,7 @@ modules:
       version: v0.17.0-rc.4
     - name: github.com/getoutreach/stencil-circleci
       url: https://github.com/getoutreach/stencil-circleci
-      version: v1.16.2-rc.3
+      version: v1.17.0-rc.1
     - name: github.com/getoutreach/stencil-discovery
       url: https://github.com/getoutreach/stencil-discovery
       version: v1.8.10-rc.1
