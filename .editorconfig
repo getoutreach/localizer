@@ -8,9 +8,16 @@ insert_final_newline = true
 [*.go,Makefile]
 indent_style = tab
 
-[*.{bash,rb,sh,slim,yml,yaml}]
+[*.{bash,json,rb,sh,slim,toml,yml,yaml}]
 indent_style = space
 indent_size  = 2
+
+[*.py]
+indent_style = space
+indent_size = 4
+
+[*.md]
+trim_trailing_whitespace = false
 
 ## <<Stencil::Block(editorconfig)>>
 

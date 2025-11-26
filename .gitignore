@@ -6,7 +6,7 @@
 *.dylib
 
 # Editor files
-*.swp
+[._]*.sw[a-p]
 *~
 \#*\#
 .idea/*
