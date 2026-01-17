@@ -43,7 +43,7 @@ type Proxier struct {
 
 	opts *ProxyOpts
 
-	queue             workqueue.RateLimitingInterface
+	queue             workqueue.TypedRateLimitingInterface[string]
 	threadiness       int
 	svcInformer       cache.SharedIndexInformer
 	endpointsInformer cache.SharedIndexInformer
@@ -92,7 +92,7 @@ func NewProxier(ctx context.Context, k kubernetes.Interface, kconf *rest.Config,
 		rest:              kconf,
 		log:               log,
 		opts:              opts,
-		queue:             workqueue.NewRateLimitingQueue(workqueue.DefaultItemBasedRateLimiter()),
+		queue:             workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedItemBasedRateLimiter[string]()),
 		threadiness:       1,
 		svcInformer:       svcInformer,
 		endpointsInformer: endpointsInformer,
@@ -188,7 +188,7 @@ func (p *Proxier) processNextWorkItem() bool {
 	defer p.queue.Done(key)
 
 	// Invoke the method containing the business logic
-	err := p.reconcile(key.(string))
+	err := p.reconcile(key)
 
 	if err == nil {
 		// Forget about the #AddRateLimited history of the key on every successful synchronization.
