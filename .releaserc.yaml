@@ -24,7 +24,8 @@ plugins:
 
   # This creates fancy release notes in our Github release
   - "@semantic-release/release-notes-generator"
-  # Create the Github Release
+
+  # Create the GitHub Release
   - - "@semantic-release/github"
     - assets:
         - "dist/*.tar.gz"

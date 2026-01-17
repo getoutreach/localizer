@@ -6,7 +6,7 @@ DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 libDir="$DIR/../.bootstrap"
 lockfile="$DIR/../stencil.lock"
 serviceYaml="$DIR/../service.yaml"
-gojqVersion="v0.12.17"
+gojqVersion="v0.12.18"
 
 # get_absolute_path returns the absolute path of a file
 get_absolute_path() {
@@ -104,6 +104,9 @@ if [[ ! -e $libDir ]] || [[ $existingVersion != "$version" ]] || [[ ! -e "$libDi
   else
     git clone -q --single-branch --branch "$version" git@github.com:getoutreach/devbase \
       "$libDir" >/dev/null
+    if command -v mise >/dev/null; then
+      mise trust --cd "$libDir" --env devbase >/dev/null
+    fi
   fi
 
   echo -n "$version" >"$libDir/.version"

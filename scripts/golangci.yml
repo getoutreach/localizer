@@ -1,69 +1,14 @@
 # yaml-language-server: $schema=https://json.schemastore.org/golangci-lint
+version: "2"
 lintroller:
   tier: "silver"
-
-# Linter settings
-linters-settings:
-  errcheck:
-    check-blank: true
-  govet:
-    enable:
-      - shadow
-  revive:
-    rules:
-      # Enable the default golint rules. We must include these because
-      # we configure a single rule, which disables the default rules.
-      - name: blank-imports
-      - name: context-as-argument
-      - name: context-keys-type
-      - name: dot-imports
-      - name: error-return
-      - name: error-strings
-      - name: error-naming
-      - name: exported
-      - name: increment-decrement
-      - name: var-naming
-      - name: var-declaration
-      - name: package-comments
-      - name: range
-      - name: receiver-naming
-      - name: time-naming
-      - name: unexported-return
-      - name: indent-error-flow
-      - name: errorf
-      - name: empty-block
-      - name: superfluous-else
-      - name: unreachable-code
-      - name: redefines-builtin-id
-      # While we agree with this rule, right now it would break too many
-      # projects. So, we disable it by default.
-      - name: unused-parameter
-        disabled: true
-  gocyclo:
-    min-complexity: 25
-  dupl:
-    threshold: 100
-  goconst:
-    min-len: 3
-    min-occurrences: 3
-  lll:
-    line-length: 140
-  gocritic:
-    enabled-tags:
-      - diagnostic
-      - experimental
-      - opinionated
-      - performance
-      - style
-    disabled-checks:
-      - whyNoLint # Doesn't seem to work properly
-  funlen:
-    lines: 500
-    statements: 50
-
+output:
+  formats:
+    text:
+      path: stdout
 linters:
   # Inverted configuration with enable-all and disable is not scalable during updates of golangci-lint.
-  disable-all: true
+  default: none
   enable:
     - bodyclose
     - copyloopvar # Detects places where loop variables are copied.
@@ -76,56 +21,149 @@ linters:
     - goconst
     - gocritic
     - gocyclo
-    - gofmt
-    - goimports
-    - revive
     - gosec
-    - gosimple
     - govet
     - ineffassign
     - lll
     # - misspell        # The reason we're disabling this right now is because it uses 1/2 of the memory of the run.
     - nakedret
+    - revive
     - staticcheck
-    - typecheck
     - unconvert
-    - unparam
-    - unused
+    # - unparam # Previously suppressed by --fast in v1, disabling for now to avoid noise
+    # - unused # Previously suppressed by --fast in v1, disabling for now to avoid noise
     - whitespace
-
+  settings:
+    dupl:
+      threshold: 100
+    errcheck:
+      check-blank: true
+    funlen:
+      lines: 500
+      statements: 50
+    goconst:
+      min-len: 3
+      min-occurrences: 3
+    gocritic:
+      disabled-checks:
+        - whyNoLint # Doesn't seem to work properly
+        - ifElseChain
+        - rangeValCopy
+      enabled-tags:
+        - diagnostic
+        - experimental
+        - opinionated
+        - performance
+        - style
+    gocyclo:
+      min-complexity: 25
+    govet:
+      enable:
+        - shadow
+      disable:
+        - buildtag
+        - printf
+        - atomic
+    lll:
+      line-length: 140
+    revive:
+      rules:
+        # Enable the default golint rules. We must include these because
+        # we configure a single rule, which disables the default rules.
+        - name: blank-imports
+        - name: context-as-argument
+        - name: context-keys-type
+        - name: dot-imports
+        - name: error-return
+        - name: error-strings
+        - name: error-naming
+        - name: exported
+        - name: increment-decrement
+        - name: var-naming
+          arguments:
+            - []
+            - []
+            - - skip-package-name-checks: true # Allow meaningless package names for historical reasons
+        - name: var-declaration
+        - name: package-comments
+        - name: range
+        - name: receiver-naming
+        - name: time-naming
+        - name: unexported-return
+          disabled: true # Previously suppressed by --fast in v1, disabling for now to avoid noise
+        - name: indent-error-flow
+        - name: errorf
+        - name: empty-block
+        - name: superfluous-else
+        - name: unreachable-code
+        - name: redefines-builtin-id
+        # While we agree with this rule, right now it would break too many
+        # projects. So, we disable it by default.
+        - name: unused-parameter
+          disabled: true
+    staticcheck:
+      checks:
+        [
+          "all",
+          "-ST1000",
+          "-ST1003",
+          "-ST1016",
+          "-ST1020",
+          "-ST1021",
+          "-ST1022",
+          "-ST1001",
+          "-ST1005",
+          "-QF1001",
+          "-QF1002",
+          "-QF1007",
+          "-QF1008",
+          "-QF1009",
+        ]
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    rules:
+      # Exclude some linters from running on tests files.
+      - linters:
+          - errcheck
+          - funlen
+          - gochecknoglobals # Globals in test files are tolerated.
+          - goconst # Repeated consts in test files are tolerated.
+          - gocyclo
+          - gosec
+        path: _test\.go
+      # This rule is buggy and breaks on our `///Block` lines.  Disable for now.
+      - linters:
+          - gocritic
+        text: "commentFormatting: put a space"
+      # This rule incorrectly flags nil references after assert.Assert(t, x != nil)
+      - linters:
+          - staticcheck
+        path: _test\.go
+        text: SA5011
+      - linters:
+          - lll
+        source: "^//go:generate "
+      # We allow error shadowing
+      - path: (.+)\.go$
+        text: declaration of "err" shadows declaration at
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
 issues:
   max-same-issues: 10
-  exclude:
-    # We allow error shadowing
-    - 'declaration of "err" shadows declaration at'
-
-  # Excluding configuration per-path, per-linter, per-text and per-source
-  exclude-rules:
-    # Exclude some linters from running on tests files.
-    - path: _test\.go
-      linters:
-        - gocyclo
-        - errcheck
-        - gosec
-        - funlen
-        - gochecknoglobals # Globals in test files are tolerated.
-        - goconst # Repeated consts in test files are tolerated.
-    # This rule is buggy and breaks on our `///Block` lines.  Disable for now.
-    - linters:
-        - gocritic
-      text: "commentFormatting: put a space"
-    # This rule incorrectly flags nil references after assert.Assert(t, x != nil)
-    - path: _test\.go
-      text: "SA5011"
-      linters:
-        - staticcheck
-    - linters:
-        - lll
-      source: "^//go:generate "
-
-output:
-  formats:
-    - format: colored-line-number
-      path: stdout
-  sort-results: true
-  print-severity: true
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$

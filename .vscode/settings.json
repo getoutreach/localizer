@@ -4,7 +4,7 @@
   // <<Stencil::Block(settings)>>
 
   // <</Stencil::Block>>
-  "go.lintTool": "golangci-lint",
+  "go.lintTool": "golangci-lint-v2",
   "go.lintFlags": [],
   "go.formatTool": "goimports",
   "go.useLanguageServer": true,
@@ -22,8 +22,8 @@
   "files.trimTrailingWhitespace": true,
   // This prevents 99% of issues with linters :)
   "editor.formatOnSave": true,
-  "shellcheck.customArgs": ["-P", "SCRIPTDIR", "-x"],
-  "shellformat.path": "./.bootstrap/shell/shfmt.sh",
+  "bashIde.shellcheckPath": "./.bootstrap/shell/shellcheck.sh",
+  "bashIde.shfmt.path": "./.bootstrap/shell/shfmt.sh",
   "[dockerfile]": {
     "editor.defaultFormatter": "ms-azuretools.vscode-docker"
   },
@@ -31,7 +31,7 @@
     "editor.defaultFormatter": "esbenp.prettier-vscode"
   },
   "[proto3]": {
-    "editor.defaultFormatter": "zxh404.vscode-proto3"
+    "editor.defaultFormatter": "DrBlury.protobuf-vsc"
   },
   "[yaml]": {
     "editor.defaultFormatter": "esbenp.prettier-vscode"
@@ -42,7 +42,5 @@
   "[terraform]": {
     "editor.defaultFormatter": "hashicorp.terraform"
   },
-  "protoc": {
-    "options": ["--proto_path=${workspaceRoot}/api"]
-  }
+  "protobuf.includes": ["${workspaceFolder}/api"]
 }
