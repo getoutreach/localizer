@@ -46,7 +46,7 @@ info:
     framework: stencil
     language: Golang
     stencil_version: v1.43.0
-    golang_version: 1.23.4
+    golang_version: 1.25.5
     cli: true
     service: false
     product: Outreach

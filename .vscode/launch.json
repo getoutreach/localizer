@@ -9,9 +9,9 @@
       "type": "go",
       "request": "launch",
       "mode": "debug",
-      "envFile": "${workspaceRoot}/.vscode/private.env",
-      "go.testEnvFile": "${workspaceRoot}/.vscode/private.env",
-      "program": "${workspaceRoot}/cmd/localizer/",
+      "envFile": "${workspaceFolder}/.vscode/private.env",
+      "go.testEnvFile": "${workspaceFolder}/.vscode/private.env",
+      "program": "${workspaceFolder}/cmd/localizer/",
       "buildFlags": "-tags=or_dev"
     },
     {
@@ -32,20 +32,20 @@
           // is compiled into the built binary. Note: This is not impacted by trimpath
           // because devbase currently uses dlv to compile the source code.
           // See: https://github.com/getoutreach/devbase/blob/main/shell/debug.sh#L72
-          "from": "${workspaceRoot}",
+          "from": "${workspaceFolder}",
           "to": "/home/dev/app"
         },
         // Maps the go module cache on the host to the persistent volume used by devspaces.
         // These should be the respective values of `go env GOMODCACHE`.
         {
-          "from": "${env:HOME}/.asdf/installs/golang/1.23.4/packages/pkg/mod",
-          "to": "/home/dev/.asdf/installs/golang/1.23.4/packages/pkg/mod"
+          "from": "${env:HOME}/.asdf/installs/golang/1.25.5/packages/pkg/mod",
+          "to": "/home/dev/.asdf/installs/golang/1.25.5/packages/pkg/mod"
         },
         {
           // Maps the standard library location on the host to the location in the devspace.
           // This enables debugging standard library code.
-          "from": "${env:HOME}/.asdf/installs/golang/1.23.4/go/src",
-          "to": "/home/dev/.asdf/installs/golang/1.23.4/go/src"
+          "from": "${env:HOME}/.asdf/installs/golang/1.25.5/go/src",
+          "to": "/home/dev/.asdf/installs/golang/1.25.5/go/src"
         }
       ]
     },
