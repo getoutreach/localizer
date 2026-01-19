@@ -16,7 +16,7 @@ require (
 	github.com/google/gofuzz v1.2.0 // indirect
 	github.com/metal-stack/go-ipam v1.14.14
 	github.com/pkg/errors v0.9.1
-	github.com/sirupsen/logrus v1.9.3
+	github.com/sirupsen/logrus v1.9.4
 	github.com/urfave/cli/v2 v2.27.7 // indirect
 	golang.org/x/crypto v0.47.0
 	google.golang.org/grpc v1.78.0
