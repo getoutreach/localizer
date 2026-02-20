@@ -5,6 +5,10 @@ updates:
     directory: "/"
     schedule:
       interval: "daily"
+    cooldown:
+      default-days: 7
+      exclude:
+        - "github.com/getoutreach/*"
     # stencil-golang managed dependencies
     ignore:
       - dependency-name: github.com/getoutreach/gobox
@@ -13,9 +17,9 @@ updates:
       - dependency-name: github.com/getoutreach/mint
       - dependency-name: github.com/getoutreach/governancelib
       - dependency-name: github.com/getoutreach/datastores/v2
-      - dependency-name: github.com/getoutreach/services
       - dependency-name: github.com/getoutreach/httpx
       - dependency-name: github.com/getoutreach/governance
+      - dependency-name: github.com/getoutreach/services
       ## <<Stencil::Block(dependabotGoIgnore)>>
 
       ## <</Stencil::Block>>
@@ -25,6 +29,10 @@ updates:
     directory: "/"
     schedule:
       interval: "daily"
+    cooldown:
+      default-days: 7
+      exclude:
+        - "@getoutreach/*"
     ignore:
       - dependency-name: "*"
 

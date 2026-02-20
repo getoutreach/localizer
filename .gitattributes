@@ -1,8 +1,11 @@
+mise.lock linguist-generated
+stencil.lock linguist-generated
+
+### Start attributes inserted by other modules
 go.sum linguist-generated
-*_pb.d.ts linguist-generated
 *.pb.go linguist-generated
-*_pb.js linguist-generated
-*_pb.rb linguist-generated
-internal/ent linguist-generated
-internal/ent/schema/*.go -text diff=golang
-bootstrap.lock linguist-generated
+### End attributes inserted by other modules
+
+## <<Stencil::Block(gitattributesAdditional)>>
+
+## <</Stencil::Block>>
