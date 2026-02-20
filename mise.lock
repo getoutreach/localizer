@@ -1,0 +1,3 @@
+[[tools."npm:prettier"]]
+version = "2.8.8"
+backend = "npm:prettier"
